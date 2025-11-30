@@ -1,7 +1,7 @@
 
 
 import { GameSaveData, UnitType, UnitRuntimeStats, Resources, GameModifiers, BioPluginConfig, PluginInstance, ElementType } from '../types';
-import { INITIAL_GAME_STATE, UNIT_CONFIGS, UNIT_UPGRADE_COST_BASE, RECYCLE_REFUND_RATE, METABOLISM_FACILITIES, MAX_RESOURCES_BASE, BIO_PLUGINS, CAP_UPGRADE_BASE, EFFICIENCY_UPGRADE_BASE, QUEEN_UPGRADE_BASE, INITIAL_LARVA_CAP } from '../constants';
+import { INITIAL_GAME_STATE, UNIT_CONFIGS, UNIT_UPGRADE_COST_BASE, RECYCLE_REFUND_RATE, METABOLISM_FACILITIES, MAX_RESOURCES_BASE, BIO_PLUGINS, CAP_UPGRADE_BASE, EFFICIENCY_UPGRADE_BASE, QUEEN_UPGRADE_BASE, INITIAL_LARVA_CAP, CLICK_CONFIG } from '../constants';
 
 export type Listener = (data: any) => void;
 
@@ -135,18 +135,18 @@ export class DataManager {
     }
 
     public updateTick(dt: number) {
-        this.updateMetabolism(dt);
-        this.updateQueen(dt);
-        this.updateHatchery(dt);
+        this.updateMetabolism(dt); // Sets rates.biomass, rates.enzymes, rates.dna
+        this.updateQueen(dt);      // Update Queen Logic (Produces Larva)
         
-        // Calculate Larva Rate (Theoretical Average)
+        // Calculate Base Larva Rate (Income)
         const queenStats = this.getQueenStats();
         const queenCount = this.state.hive.unitStockpile[UnitType.QUEEN] || 0;
-        if (queenCount > 0) {
-            this.rates.larva = (queenCount * queenStats.amount) / queenStats.interval;
-        } else {
-            this.rates.larva = 0;
-        }
+        this.rates.larva = (queenCount > 0) 
+            ? (queenCount * queenStats.amount) / queenStats.interval 
+            : 0;
+
+        // Update Hatchery: Consumes resources AND updates Net Rates
+        this.updateHatchery(dt);
     }
 
     public modifyResource(type: keyof Resources, amount: number) {
@@ -392,6 +392,10 @@ export class DataManager {
         const stockpile = this.state.hive.unitStockpile;
         const resources = this.state.resources;
 
+        let totalBioDrain = 0;
+        let totalDnaDrain = 0;
+        let totalLarvaDrain = 0;
+
         Object.values(units).forEach(unit => {
             if (!unit.isProducing) return;
             if ((stockpile[unit.id] || 0) >= unit.cap) return;
@@ -403,6 +407,14 @@ export class DataManager {
             const larvaCost = config.baseCost.larva;
             const timeCost = config.baseCost.time * discount;
 
+            // Calculate Demand Rate (for UI display)
+            if (timeCost > 0) {
+                totalBioDrain += bioCost / timeCost;
+                totalDnaDrain += dnaCost / timeCost;
+                totalLarvaDrain += larvaCost / timeCost;
+            }
+
+            // Execution Logic
             if (resources.biomass >= bioCost && 
                 resources.dna >= dnaCost &&
                 resources.larva >= larvaCost) {
@@ -420,6 +432,21 @@ export class DataManager {
                 }
             }
         });
+
+        // Update Rates with the Drain
+        this.rates.biomass -= totalBioDrain;
+        this.rates.dna -= totalDnaDrain;
+        this.rates.larva -= totalLarvaDrain;
+    }
+
+    public getClickValue(): number {
+        // Formula: Base + (BiomassRate * Scaling)
+        return CLICK_CONFIG.BASE + (this.rates.biomass * CLICK_CONFIG.SCALING);
+    }
+
+    public handleManualClick() {
+        const value = this.getClickValue();
+        this.modifyResource('biomass', value);
     }
 
     public toggleProduction(type: UnitType) {

@@ -18,6 +18,12 @@ export const UNIT_UPGRADE_COST_BASE = 100;
 // export const MAX_SCREEN_UNITS = 60; // DEPRECATED in favor of per-unit caps
 export const RECYCLE_REFUND_RATE = 0.8; 
 
+// --- CLICK CONFIG ---
+export const CLICK_CONFIG = {
+    BASE: 10.0,
+    SCALING: 0.05
+};
+
 // --- NEW: PER-UNIT SCREEN CAPS (Local Battle Limits) ---
 export const UNIT_SCREEN_CAPS: Record<UnitType, number> = {
     [UnitType.MELEE]: 200,      // Swarm
@@ -78,23 +84,23 @@ export const OBSTACLES = [
 export const METABOLISM_FACILITIES = {
     // ==========================================
     // TIER 1: 表面刮取 (Surface Scavenging)
-    // 核心逻辑：线性积累，快速启动
+    // 核心逻辑：线性积累，长线基石
     // ==========================================
     VILLI: {
         NAME: "菌毯绒毛 (Villi)",
         DESC: "基础吸收。每50个提供 x1.25 全局乘区。",
         BASE_COST: 15,
         GROWTH: 1.15,
-        BASE_RATE: 5.0,  // 优化值
+        BASE_RATE: 1.0,  // [关键修正] 从 5.0 降至 1.0，拉长初期体验
         COST_RESOURCE: 'biomass'
     },
     TAPROOT: {
         NAME: "深钻根须 (Taproot)",
-        DESC: "深层供养。使绒毛基础产出 +2.0。",
+        DESC: "深层供养。使绒毛基础产出 +0.2。",
         BASE_COST: 500,
-        GROWTH: 1.20,
+        GROWTH: 1.25,    // [关键修正] 成本增长提升，控制数量
         BASE_RATE: 0,
-        BONUS_TO_VILLI: 2.0,
+        BONUS_TO_VILLI: 0.2, // [关键修正] 加成削弱10倍 (2.0->0.2)，防止指数爆炸
         COST_RESOURCE: 'biomass'
     },
     
@@ -107,7 +113,7 @@ export const METABOLISM_FACILITIES = {
         DESC: "工业基石。提供稳定的生物质流。",
         BASE_COST: 12000,
         GROWTH: 1.15,
-        BASE_RATE: 120.0,
+        BASE_RATE: 60.0, // [关键修正] 配合T1削弱，下调至60，保持层级差异但不碾压
         COST_RESOURCE: 'biomass'
     },
     BREAKER: {
@@ -116,13 +122,12 @@ export const METABOLISM_FACILITIES = {
         BASE_COST: 150000,
         GROWTH: 1.30,
         BASE_RATE: 3500.0,
-        LOSS_RATE: 0.0002, // 0.02% 流失
+        LOSS_RATE: 0.0002, // 0.02% 流失 (温和的软上限)
         COST_RESOURCE: 'biomass'
     },
     
     // ==========================================
-    // TIER 3: 战争收割 (Warfare Harvesting)
-    // 核心逻辑：挂钩战斗数据 (Kills/Unit Death)
+    // TIER 3-5: 高阶设施 (保持原设计逻辑)
     // ==========================================
     NECRO_SIPHON: {
         NAME: "尸骸转化冢 (Necro Siphon)",
@@ -133,21 +138,6 @@ export const METABOLISM_FACILITIES = {
         KILL_SCALAR: 10.0,
         COST_RESOURCE: 'biomass'
     },
-    // T3 Energy
-    BLOOD_FUSION: {
-        NAME: "鲜血聚变堆 (Blood Fusion)",
-        DESC: "内循环。每秒吞噬 1 只近战兵种 -> 转化 2000 Enz。",
-        BASE_COST: 500000, // 500k Enz
-        GROWTH: 1.50,
-        INPUT_UNIT: 'MELEE',
-        OUTPUT_ENZ: 2000,
-        COST_RESOURCE: 'enzymes'
-    },
-
-    // ==========================================
-    // TIER 4: 地质破坏 (Crust Fracturing)
-    // 核心逻辑：乘区释放 (Synergy)
-    // ==========================================
     RED_TIDE: {
         NAME: "红潮藻井 (Red Tide Silo)",
         DESC: "生态协同。产出 = 基础值 * (1 + 绒毛数量/50)。",
@@ -156,20 +146,6 @@ export const METABOLISM_FACILITIES = {
         BASE_RATE: 15000.0,
         COST_RESOURCE: 'biomass'
     },
-    // T4 Energy
-    RESONATOR: {
-        NAME: "突触谐振塔 (Synaptic Resonator)",
-        DESC: "大数定律。产出 = √总人口 * 500。",
-        BASE_COST: 10000000, // 10M Enz
-        GROWTH: 1.45,
-        POP_SCALAR: 500,
-        COST_RESOURCE: 'enzymes'
-    },
-
-    // ==========================================
-    // TIER 5: 行星液化 (Planetary Liquefaction)
-    // 核心逻辑：指数与阻尼复利 (终局)
-    // ==========================================
     GAIA_DIGESTER: {
         NAME: "盖亚消化池 (Gaia Digester)",
         DESC: "星球吞噬。产出 = 50 * (当前库存)^0.8。阻尼复利。",
@@ -179,17 +155,7 @@ export const METABOLISM_FACILITIES = {
         COEFF: 50.0,
         COST_RESOURCE: 'biomass'
     },
-    // T5 Energy
-    ENTROPY_VENT: {
-        NAME: "熵增排放口 (Entropy Vent)",
-        DESC: "双曲贴现。每秒燃烧 1% Bio库存 -> 5x 等价 Enz。",
-        BASE_COST: 1000000000, // 1B Enz
-        GROWTH: 2.50,
-        BURN_RATE: 0.01,
-        CONVERT_RATIO: 5.0,
-        COST_RESOURCE: 'enzymes'
-    },
-
+    
     // ==========================================
     // 能量转化设施 (Energy Conversion)
     // ==========================================
@@ -198,7 +164,7 @@ export const METABOLISM_FACILITIES = {
         DESC: "基础转化：60 Bio -> 1 Enz。",
         BASE_COST: 8000,
         GROWTH: 1.15,
-        INPUT: 60,
+        INPUT: 60, // 降低门槛 (原100)，防止T1资源枯竭
         OUTPUT: 1,
         COST_RESOURCE: 'biomass'
     },
@@ -217,7 +183,7 @@ export const METABOLISM_FACILITIES = {
         BASE_COST: 25000,
         GROWTH: 1.20,
         INPUT: 400,
-        OUTPUT: 30,
+        OUTPUT: 30, // 转化比 13.3:1 (优于Sac的60:1)
         HEAT_GEN: 5,
         COOL_RATE: 8,
         COST_RESOURCE: 'enzymes'
@@ -229,6 +195,32 @@ export const METABOLISM_FACILITIES = {
         GROWTH: 1.30,
         INPUT_LARVA: 1,
         OUTPUT_ENZ: 800,
+        COST_RESOURCE: 'enzymes'
+    },
+    BLOOD_FUSION: {
+        NAME: "鲜血聚变堆 (Blood Fusion)",
+        DESC: "内循环。每秒吞噬 1 只近战兵种 -> 转化 2000 Enz。",
+        BASE_COST: 500000, // 500k Enz
+        GROWTH: 1.50,
+        INPUT_UNIT: 'MELEE',
+        OUTPUT_ENZ: 2000,
+        COST_RESOURCE: 'enzymes'
+    },
+    RESONATOR: {
+        NAME: "突触谐振塔 (Synaptic Resonator)",
+        DESC: "大数定律。产出 = √总人口 * 500。",
+        BASE_COST: 10000000, // 10M Enz
+        GROWTH: 1.45,
+        POP_SCALAR: 500,
+        COST_RESOURCE: 'enzymes'
+    },
+    ENTROPY_VENT: {
+        NAME: "熵增排放口 (Entropy Vent)",
+        DESC: "双曲贴现。每秒燃烧 1% Bio库存 -> 5x 等价 Enz。",
+        BASE_COST: 1000000000, // 1B Enz
+        GROWTH: 2.50,
+        BURN_RATE: 0.01,
+        CONVERT_RATIO: 5.0,
         COST_RESOURCE: 'enzymes'
     },
 
@@ -259,7 +251,6 @@ export const METABOLISM_FACILITIES = {
         PERCENT: 0.01,
         COST_RESOURCE: 'enzymes'
     },
-    // T3 Data
     COMBAT_CORTEX: {
         NAME: "前线皮质 (Combat Cortex)",
         DESC: "战意解析。基于当前交战单位数产出 DNA。",
@@ -268,7 +259,6 @@ export const METABOLISM_FACILITIES = {
         BASE_RATE: 0.5,
         COST_RESOURCE: 'enzymes'
     },
-    // T4 Data
     GENE_ARCHIVE: {
         NAME: "基因档案馆 (Gene Archive)",
         DESC: "代际传承。解锁元进度折扣 (暂未实装)。",
@@ -276,7 +266,6 @@ export const METABOLISM_FACILITIES = {
         GROWTH: 2.00,
         COST_RESOURCE: 'enzymes'
     },
-    // T5 Data
     OMEGA_POINT: {
         NAME: "欧米茄演算机 (Omega Point)",
         DESC: "终局计算。重置获取系数 10 -> 15。",

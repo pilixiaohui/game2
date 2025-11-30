@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { GameSaveData, UnitType, HiveSection, Polarity, GameStateSnapshot, RegionData } from '../types';
-import { UNIT_CONFIGS, METABOLISM_FACILITIES, BIO_PLUGINS, PLAYABLE_UNITS } from '../constants';
+import { UNIT_CONFIGS, METABOLISM_FACILITIES, BIO_PLUGINS, PLAYABLE_UNITS, CLICK_CONFIG } from '../constants';
 import { DataManager } from '../game/DataManager';
 import { GameEngine } from '../game/GameEngine';
 import { GameCanvas } from './GameCanvas';
@@ -106,6 +106,7 @@ export const HiveView: React.FC<HiveViewProps> = ({
 
   const renderMetabolism = () => {
     const meta = globalState.hive.metabolism;
+    const clickVal = DataManager.instance.getClickValue();
     
     // Config Grouping based on V1.3 Design Doc
     const groups = [
@@ -244,6 +245,29 @@ export const HiveView: React.FC<HiveViewProps> = ({
                     <h3 className="text-2xl font-black text-green-500 uppercase tracking-widest mb-1">生产工程 (Metabolism)</h3>
                     <p className="text-gray-500 text-sm">Optimize the resource conversion loops.</p>
                 </div>
+            </div>
+
+            {/* Manual Harvest Button */}
+            <div className="bg-gradient-to-r from-green-900/20 to-black border border-green-500/30 rounded-xl p-6 flex items-center justify-between relative overflow-hidden group">
+                 <div className="absolute inset-0 bg-green-500/5 group-hover:bg-green-500/10 transition-colors pointer-events-none" />
+                 
+                 <div>
+                     <h4 className="text-xl font-bold text-white uppercase tracking-widest mb-1">手动收割 (Manual Harvest)</h4>
+                     <div className="text-gray-400 text-xs">
+                         主动从环境刮取生物质。<br/>
+                         收益受当前自动产出率加成 (Base: {CLICK_CONFIG.BASE} + {(CLICK_CONFIG.SCALING * 100).toFixed(0)}%).
+                     </div>
+                 </div>
+
+                 <button
+                    onClick={() => DataManager.instance.handleManualClick()}
+                    className="relative z-10 px-8 py-4 bg-green-600 hover:bg-green-500 active:scale-95 text-white font-black text-xl uppercase tracking-widest rounded shadow-[0_0_20px_rgba(34,197,94,0.4)] transition-all border border-green-400 select-none"
+                 >
+                     <div className="flex flex-col items-center leading-none">
+                         <span>HARVEST</span>
+                         <span className="text-[10px] font-mono opacity-80 mt-1">+{Math.floor(clickVal).toLocaleString()} BIO</span>
+                     </div>
+                 </button>
             </div>
             
             <div className="space-y-6">
