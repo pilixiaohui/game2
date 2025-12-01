@@ -132,7 +132,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_MELEE_ATTACK', params: {} },
-        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 2.0, cohesionWeight: 0.2, alignmentWeight: 0.1 } }
     ]
   },
@@ -153,7 +153,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x8b5cf6 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 1.5, cohesionWeight: 0.3 } }
     ]
   },
@@ -174,7 +174,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 40 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 45, separationForce: 1.0 } }
     ]
   },
@@ -196,7 +196,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_FAST_MOVEMENT', params: { multiplier: 1.3 } },
-        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 2.5 } }
     ]
   },
@@ -222,7 +222,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_CLEAVE_ATTACK', params: { radius: 60, percentage: 0.5 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_REGEN', params: { rate: 0.05 } },
-        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 80, separationForce: 3.0 } }
     ]
   },
@@ -245,7 +245,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0xd946ef } },
         { id: 'GENE_REGEN', params: { rate: 0.1 } },
-        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 1.0 } }
     ]
   },
@@ -352,64 +352,64 @@ export const ELEMENT_COLORS: Record<ElementType, number> = {
 };
 
 export const INITIAL_REGIONS_CONFIG: RegionData[] = [
-  { id: 1, name: "第七区贫民窟", x: 10, y: 50, difficultyMultiplier: 1.0, devourProgress: 0, isUnlocked: true, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 1.0 }] },
-  { id: 2, name: "工业污染区", x: 25, y: 30, difficultyMultiplier: 1.2, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.7 }, { type: UnitType.HUMAN_PYRO, weight: 0.3 }] },
-  { id: 3, name: "地下铁枢纽", x: 30, y: 70, difficultyMultiplier: 1.3, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.5 }, { type: UnitType.HUMAN_RIOT, weight: 0.5 }] },
-  { id: 4, name: "中央公园", x: 45, y: 50, difficultyMultiplier: 1.5, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.4 }, { type: UnitType.HUMAN_RIOT, weight: 0.3 }, { type: UnitType.HUMAN_SNIPER, weight: 0.3 }] },
-  { id: 5, name: "99号高速公路", x: 55, y: 20, difficultyMultiplier: 1.8, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_RIOT, weight: 0.4 }, { type: UnitType.HUMAN_PYRO, weight: 0.4 }, { type: UnitType.HUMAN_MARINE, weight: 0.2 }] },
-  { id: 6, name: "生物实验室", x: 60, y: 80, difficultyMultiplier: 2.0, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.5 }, { type: UnitType.HUMAN_SNIPER, weight: 0.4 }, { type: UnitType.HUMAN_TANK, weight: 0.1 }] },
-  { id: 7, name: "军事前哨站", x: 75, y: 40, difficultyMultiplier: 2.5, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_RIOT, weight: 0.3 }, { type: UnitType.HUMAN_TANK, weight: 0.2 }, { type: UnitType.HUMAN_MARINE, weight: 0.5 }] },
-  { id: 8, name: "内城区", x: 80, y: 65, difficultyMultiplier: 3.0, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_PYRO, weight: 0.4 }, { type: UnitType.HUMAN_TANK, weight: 0.3 }, { type: UnitType.HUMAN_SNIPER, weight: 0.3 }] },
-  { id: 9, name: "联合指挥中心", x: 90, y: 50, difficultyMultiplier: 4.0, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_TANK, weight: 0.6 }, { type: UnitType.HUMAN_RIOT, weight: 0.4 }] },
-  { id: 10, name: "最后的方舟", x: 95, y: 20, difficultyMultiplier: 5.0, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.1 }, { type: UnitType.HUMAN_RIOT, weight: 0.1 }, { type: UnitType.HUMAN_PYRO, weight: 0.1 }, { type: UnitType.HUMAN_SNIPER, weight: 0.1 }, { type: UnitType.HUMAN_TANK, weight: 0.6 }] },
+    { 
+        id: 1, 
+        name: "第7区贫民窟 (Sector 7 Slums)", 
+        x: 10, y: 50, 
+        difficultyMultiplier: 1.0, 
+        spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 1.0 }],
+        isUnlocked: true, devourProgress: 0, isFighting: false
+    },
+    { 
+        id: 2, 
+        name: "工业废墟 (Industrial Ruins)", 
+        x: 35, y: 70, 
+        difficultyMultiplier: 1.5, 
+        spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.7 }, { type: UnitType.HUMAN_RIOT, weight: 0.3 }],
+        isUnlocked: false, devourProgress: 0, isFighting: false
+    },
+    { 
+        id: 3, 
+        name: "商业中心 (Commerce Hub)", 
+        x: 60, y: 40, 
+        difficultyMultiplier: 2.5, 
+        spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.5 }, { type: UnitType.HUMAN_RIOT, weight: 0.3 }, { type: UnitType.HUMAN_SNIPER, weight: 0.2 }],
+        isUnlocked: false, devourProgress: 0, isFighting: false
+    },
+    { 
+        id: 4, 
+        name: "轨道电梯基座 (Orbital Base)", 
+        x: 85, y: 20, 
+        difficultyMultiplier: 4.0, 
+        spawnTable: [{ type: UnitType.HUMAN_RIOT, weight: 0.4 }, { type: UnitType.HUMAN_PYRO, weight: 0.3 }, { type: UnitType.HUMAN_TANK, weight: 0.3 }],
+        isUnlocked: false, devourProgress: 0, isFighting: false
+    }
 ];
-
-const createInitialUnitState = (id: UnitType): UnitState => ({
-    id,
-    level: 1,
-    loadout: [null, null, null, null, null],
-    cap: id === UnitType.MELEE ? 50 : 10,
-    capLevel: 1,
-    efficiencyLevel: 1,
-    isProducing: false,
-    productionProgress: 0
-});
 
 export const INITIAL_GAME_STATE: GameSaveData = {
     resources: {
-        biomass: 0,
+        biomass: 15,
         enzymes: 0,
-        larva: 10,
+        larva: INITIAL_LARVA_CAP,
         dna: 0,
         mutagen: 0
     },
     hive: {
         unlockedUnits: {
-            [UnitType.MELEE]: { ...createInitialUnitState(UnitType.MELEE), isProducing: true },
-            [UnitType.RANGED]: createInitialUnitState(UnitType.RANGED),
-            [UnitType.QUEEN]: { ...createInitialUnitState(UnitType.QUEEN), cap: 5 },
-            [UnitType.PYROVORE]: createInitialUnitState(UnitType.PYROVORE),
-            [UnitType.CRYOLISK]: createInitialUnitState(UnitType.CRYOLISK),
-            [UnitType.OMEGALIS]: createInitialUnitState(UnitType.OMEGALIS),
-            [UnitType.HUMAN_MARINE]: createInitialUnitState(UnitType.HUMAN_MARINE),
-            [UnitType.HUMAN_RIOT]: createInitialUnitState(UnitType.HUMAN_RIOT),
-            [UnitType.HUMAN_PYRO]: createInitialUnitState(UnitType.HUMAN_PYRO),
-            [UnitType.HUMAN_SNIPER]: createInitialUnitState(UnitType.HUMAN_SNIPER),
-            [UnitType.HUMAN_TANK]: createInitialUnitState(UnitType.HUMAN_TANK),
+            [UnitType.MELEE]: { id: UnitType.MELEE, level: 1, loadout: [null, null, null, null, null], cap: 200, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            [UnitType.RANGED]: { id: UnitType.RANGED, level: 1, loadout: [null, null, null, null, null], cap: 50, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            [UnitType.PYROVORE]: { id: UnitType.PYROVORE, level: 1, loadout: [null, null, null], cap: 30, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            [UnitType.CRYOLISK]: { id: UnitType.CRYOLISK, level: 1, loadout: [null, null, null], cap: 30, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            [UnitType.OMEGALIS]: { id: UnitType.OMEGALIS, level: 1, loadout: [null, null, null, null], cap: 10, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            [UnitType.QUEEN]: { id: UnitType.QUEEN, level: 1, loadout: [null, null, null], cap: 5, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            
+            [UnitType.HUMAN_MARINE]: { id: UnitType.HUMAN_MARINE, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.HUMAN_RIOT]: { id: UnitType.HUMAN_RIOT, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.HUMAN_PYRO]: { id: UnitType.HUMAN_PYRO, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.HUMAN_SNIPER]: { id: UnitType.HUMAN_SNIPER, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.HUMAN_TANK]: { id: UnitType.HUMAN_TANK, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
         },
-        unitStockpile: {
-             [UnitType.MELEE]: 0,
-             [UnitType.RANGED]: 0,
-             [UnitType.QUEEN]: 1,
-             [UnitType.PYROVORE]: 0,
-             [UnitType.CRYOLISK]: 0,
-             [UnitType.OMEGALIS]: 0,
-             [UnitType.HUMAN_MARINE]: 0,
-             [UnitType.HUMAN_RIOT]: 0,
-             [UnitType.HUMAN_PYRO]: 0,
-             [UnitType.HUMAN_SNIPER]: 0,
-             [UnitType.HUMAN_TANK]: 0
-        },
+        unitStockpile: {},
         production: {
             larvaCapBase: INITIAL_LARVA_CAP,
             queenIntervalLevel: 1,
@@ -434,13 +434,13 @@ export const INITIAL_GAME_STATE: GameSaveData = {
             storageCount: 0,
             supplyCount: 0,
             necroSiphonCount: 0,
-            bloodFusionCount: 0,
-            combatCortexCount: 0,
             redTideCount: 0,
-            synapticResonatorCount: 0,
-            geneArchiveCount: 0,
             gaiaDigesterCount: 0,
+            bloodFusionCount: 0,
+            synapticResonatorCount: 0,
             entropyVentCount: 0,
+            combatCortexCount: 0,
+            geneArchiveCount: 0,
             omegaPointCount: 0
         },
         inventory: {
@@ -450,13 +450,14 @@ export const INITIAL_GAME_STATE: GameSaveData = {
         globalBuffs: []
     },
     world: {
-        currentRegionId: 1,
-        regions: {}
+        currentRegionId: 0,
+        regions: {
+            1: { id: 1, isUnlocked: true, devourProgress: 0 }
+        }
     },
     player: {
         lastSaveTime: Date.now(),
         prestigeLevel: 0,
-        totalKills: 0,
         settings: {
             bgmVolume: 0.5,
             sfxVolume: 0.5

@@ -164,6 +164,9 @@ GeneLibrary.register({
     id: 'GENE_AUTO_ATTACK',
     name: 'Auto Attack Trigger',
     onTick: (self, dt, engine, params) => {
+        // Status Check: Stunned/Shocked
+        if (self.statuses['SHOCKED'] && Math.random() < 0.05) return;
+
         if (self.attackCooldown > 0) {
             self.attackCooldown -= dt;
         }
@@ -287,35 +290,46 @@ GeneLibrary.register({
     }
 });
 
-// --- v2.1 SPLIT MOVEMENT GENES ---
+// --- v2.3 REFACTORED MOVEMENT GENES ---
 
 GeneLibrary.register({
-    id: 'GENE_BASIC_MOVE',
-    name: 'Basic Movement Intent',
+    id: 'GENE_WANDER',
+    name: 'Idle Wander',
+    onMove: (self, velocity, dt, engine, params) => {
+        // Status Check: Stunned/Shocked
+        if (self.statuses['SHOCKED'] && Math.random() < 0.05) return;
+
+        self.wanderTimer -= dt;
+        if (self.wanderTimer <= 0) { 
+            self.wanderTimer = 1 + Math.random() * 2; 
+            self.wanderDir = Math.random() > 0.5 ? 1 : -1; 
+        }
+        // Wander horizontally, slight vertical drift
+        velocity.x += self.wanderDir * self.stats.speed * 0.3 * dt;
+        velocity.y += (Math.random() - 0.5) * 0.5;
+        
+        self.state = 'WANDER';
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_COMBAT_MOVEMENT',
+    name: 'Combat Movement (Chase/March)',
     onMove: (self, velocity, dt, engine, params) => {
         // v2.2 Combat State Check: Stop moving if attacking
         if (self.state === 'ATTACK') return;
+        
+        // Status Check: Stunned/Shocked
+        if (self.statuses['SHOCKED'] && Math.random() < 0.05) return;
 
         let isMoving = false;
 
-        // Stockpile Mode: Wandering
-        if (engine.isStockpileMode && self.faction === Faction.ZERG) {
-            self.wanderTimer -= dt;
-            if (self.wanderTimer <= 0) { 
-                self.wanderTimer = 1 + Math.random() * 2; 
-                self.wanderDir = Math.random() > 0.5 ? 1 : -1; 
-            }
-            // Wander horizontally, slight vertical drift
-            velocity.x += self.wanderDir * self.stats.speed * 0.3 * dt;
-            velocity.y += (Math.random() - 0.5) * 0.5;
-            isMoving = true;
-        } 
         // Battle Mode: Chase or March
-        else if (self.target && !self.target.isDead) {
+        if (self.target && !self.target.isDead) {
             // Chase logic
             const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
             const dist = Math.sqrt(distSq);
-            // v2.2: Stop chasing if within range (Gene Auto Attack handles state switch, but we must stop velocity here)
+            // v2.2: Stop chasing if within range (Gene Auto Attack handles state switch)
             if (dist > self.stats.range * 0.9) {
                 const dirX = (self.target.x - self.x) / dist;
                 const dirY = (self.target.y - self.y) / dist;

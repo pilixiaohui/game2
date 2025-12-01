@@ -141,7 +141,7 @@ class UnitPool {
     unit.radius = stats.width / 2;
     
     // Initialize Genes via Config
-    unit.geneConfig = config.genes || [];
+    unit.geneConfig = config.genes ? [...config.genes] : [];
 
     if (unit.view) {
       unit.view.visible = true;
@@ -330,6 +330,18 @@ export class GameEngine implements IGameEngine {
 
   public setStockpileMode(enabled: boolean) {
       this.isStockpileMode = enabled;
+      
+      // v2.3 Dynamic Gene Swapping for Mode Switch
+      if (this.unitPool) {
+          const activeUnits = this.unitPool.getActiveUnits();
+          activeUnits.forEach(u => {
+              if (u.faction === Faction.ZERG) {
+                  if (enabled) this.applyStockpileAI(u);
+                  else this.restoreCombatAI(u);
+              }
+          });
+      }
+
       if (enabled) {
           this.cameraX = 0;
           if (this.world) this.world.position.x = 0;
@@ -341,6 +353,21 @@ export class GameEngine implements IGameEngine {
           this.populateBattlefield();
           this.gracePeriodTimer = 2.0;
       }
+  }
+
+  private applyStockpileAI(unit: Unit) {
+      unit.geneConfig = [
+          { id: 'GENE_WANDER' },
+          { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 2.0 } }
+      ];
+      unit.state = 'WANDER';
+      unit.target = null;
+  }
+
+  private restoreCombatAI(unit: Unit) {
+      const config = UNIT_CONFIGS[unit.type];
+      unit.geneConfig = config.genes ? [...config.genes] : [];
+      unit.state = 'IDLE';
   }
 
   private populateBattlefield() {
@@ -378,6 +405,7 @@ export class GameEngine implements IGameEngine {
            const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
            if (DataManager.instance.consumeStockpile(type)) {
                const u = this.unitPool.spawn(Faction.ZERG, type, x, this.modifiers);
+               // Genes are set to Combat by default
                if (u) u.state = 'MOVE';
            }
       }
@@ -536,7 +564,8 @@ export class GameEngine implements IGameEngine {
           const currentVisuals = activeVisuals.filter(u => u.type === type);
           if (currentVisuals.length < targetVisualCount) {
              const u = this.unitPool!.spawn(Faction.ZERG, type, Math.random() * this.app!.screen.width, this.modifiers);
-             if (u) u.state = 'WANDER';
+             // v2.3 Apply Stockpile AI immediately
+             if (u) this.applyStockpileAI(u);
           } else if (currentVisuals.length > targetVisualCount) {
               this.unitPool!.recycle(currentVisuals[0]);
           }
@@ -548,7 +577,7 @@ export class GameEngine implements IGameEngine {
      if (u.flashTimer > 0) u.flashTimer -= dt;
      this.updateUnitVisuals(u);
 
-     if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
+     // v2.3 Removed hardcoded SHOCKED check. Handled in Genes.
 
      // --- TARGETING SYSTEM (Pure Gene Based) ---
      // Logic is now fully encapsulated in GENE_ACQUIRE_TARGET (via onUpdateTarget)
