@@ -1,5 +1,4 @@
 
-
 import { UnitType, UnitConfig, RegionData, GameSaveData, Faction, BioPluginConfig, Polarity, ElementType } from './types';
 
 export const SCREEN_PADDING = 100;
@@ -19,7 +18,6 @@ export const MAX_RESOURCES_BASE = 2000000;
 export const INITIAL_LARVA_CAP = 1000;
 export const RESOURCE_TICK_RATE_BASE = 15; 
 export const UNIT_UPGRADE_COST_BASE = 100;
-// export const MAX_SCREEN_UNITS = 60; // DEPRECATED in favor of per-unit caps
 export const RECYCLE_REFUND_RATE = 0.8; 
 
 // --- CLICK CONFIG ---
@@ -67,76 +65,102 @@ export const STATUS_CONFIG = {
 
 // --- BATTLEFIELD CONFIGURATION ---
 
-// 1. Strongholds (Defense Lines)
-// The camera will lock here until enemies in range are cleared.
-export const STRONGHOLDS = [
-    400,   // First Outpost
-    900,   // Midpoint Intercept
-    1400,  // Final Defense
-];
+export const STRONGHOLDS = [400, 900, 1400];
 
-// 2. Terrain Obstacles
-// Swarm units must flow around these, creating split streams.
 export const OBSTACLES = [
-    // x: position, y: offset from center (0), radius: size
-    { x: 250, y: 0, radius: 35 },     // Center block, forces split
-    { x: 600, y: -40, radius: 30 },   // Top block
-    { x: 600, y: 40, radius: 30 },    // Bottom block, forming a choke
-    { x: 1100, y: 0, radius: 50 },    // Large ruin
+    { x: 250, y: 0, radius: 35 },     
+    { x: 600, y: -40, radius: 30 },   
+    { x: 600, y: 40, radius: 30 },    
+    { x: 1100, y: 0, radius: 50 },    
 ];
 
 export const METABOLISM_FACILITIES = {
     // ==========================================
-    // TIER 1: 表面刮取 (Surface Scavenging)
-    // 核心逻辑：线性积累，长线基石
+    // TIER 1: Matter
     // ==========================================
     VILLI: {
         NAME: "菌毯绒毛 (Villi)",
-        DESC: "基础吸收。每50个提供 x1.25 全局乘区。",
+        DESC: "基础吸收。每100个提供 x1.25 全局乘区。",
         BASE_COST: 15,
         GROWTH: 1.15,
-        BASE_RATE: 1.0,  // [关键修正] 从 5.0 降至 1.0，拉长初期体验
+        BASE_RATE: 1.0,
+        CLUSTER_THRESHOLD: 100,
         COST_RESOURCE: 'biomass'
     },
     TAPROOT: {
         NAME: "深钻根须 (Taproot)",
-        DESC: "深层供养。使绒毛基础产出 +0.2。",
+        DESC: "深层供养。使绒毛基础产出 +0.1。",
         BASE_COST: 500,
-        GROWTH: 1.25,    // [关键修正] 成本增长提升，控制数量
+        GROWTH: 1.25,
         BASE_RATE: 0,
-        BONUS_TO_VILLI: 0.2, // [关键修正] 加成削弱10倍 (2.0->0.2)，防止指数爆炸
+        BONUS_TO_VILLI: 0.1,
         COST_RESOURCE: 'biomass'
     },
-    
-    // ==========================================
-    // TIER 2: 工业压榨 (Industrial Extraction)
-    // 核心逻辑：自动化与转化，引入“流失”负反馈
-    // ==========================================
     GEYSER: {
         NAME: "酸蚀喷泉 (Acid Geyser)",
         DESC: "工业基石。提供稳定的生物质流。",
         BASE_COST: 12000,
         GROWTH: 1.15,
-        BASE_RATE: 60.0, // [关键修正] 配合T1削弱，下调至60，保持层级差异但不碾压
+        BASE_RATE: 85.0,
         COST_RESOURCE: 'biomass'
     },
     BREAKER: {
         NAME: "地壳破碎机 (Crust Breaker)",
-        DESC: "过载开采。产出极高，每秒流失 0.02% 库存。",
+        DESC: "过载开采。产出极高，每秒流失 0.05% 库存。",
         BASE_COST: 150000,
         GROWTH: 1.30,
         BASE_RATE: 3500.0,
-        LOSS_RATE: 0.0002, // 0.02% 流失 (温和的软上限)
+        LOSS_RATE: 0.0005, // 0.05%
         COST_RESOURCE: 'biomass'
     },
     
     // ==========================================
-    // TIER 3-5: 高阶设施 (保持原设计逻辑)
+    // TIER 2: Energy
     // ==========================================
+    SAC: {
+        NAME: "发酵囊 (Fermentation Sac)",
+        DESC: "基础转化：100 Bio -> 1 Enz。",
+        BASE_COST: 10000,
+        GROWTH: 1.15,
+        INPUT: 100, 
+        OUTPUT: 1,
+        COST_RESOURCE: 'biomass'
+    },
+    PUMP: {
+        NAME: "回流泵 (Reflux Pump)",
+        DESC: "效率优化：减少发酵囊 2 消耗 (Min 50)。",
+        BASE_COST: 2500,
+        GROWTH: 1.25,
+        COST_REDUCTION: 2,
+        MIN_COST: 50,
+        COST_RESOURCE: 'enzymes'
+    },
+    CRACKER: {
+        NAME: "热能裂解堆 (Thermal Cracker)",
+        DESC: "高压裂变：500 Bio -> 15 Enz (产生热量)。",
+        BASE_COST: 25000,
+        GROWTH: 1.20,
+        INPUT: 500,
+        OUTPUT: 15, 
+        HEAT_GEN: 5,
+        COOL_RATE: 8,
+        COST_RESOURCE: 'enzymes'
+    },
+    BOILER: {
+        NAME: "血肉锅炉 (Flesh Boiler)",
+        DESC: "回收利用：1 幼虫 -> 500 Enz。",
+        BASE_COST: 100000,
+        GROWTH: 1.30,
+        INPUT_LARVA: 1,
+        OUTPUT_ENZ: 500,
+        COST_RESOURCE: 'enzymes'
+    },
+    
+    // TIER 3+
     NECRO_SIPHON: {
         NAME: "尸骸转化冢 (Necro Siphon)",
         DESC: "战争红利。产出 = 基础值 + 累计击杀数 * 10。",
-        BASE_COST: 1500000, // 1.5M Bio
+        BASE_COST: 1500000, 
         GROWTH: 1.40,
         BASE_RATE: 500.0,
         KILL_SCALAR: 10.0,
@@ -145,66 +169,25 @@ export const METABOLISM_FACILITIES = {
     RED_TIDE: {
         NAME: "红潮藻井 (Red Tide Silo)",
         DESC: "生态协同。产出 = 基础值 * (1 + 绒毛数量/50)。",
-        BASE_COST: 50000000, // 50M Bio
+        BASE_COST: 50000000, 
         GROWTH: 1.60,
         BASE_RATE: 15000.0,
         COST_RESOURCE: 'biomass'
     },
     GAIA_DIGESTER: {
         NAME: "盖亚消化池 (Gaia Digester)",
-        DESC: "星球吞噬。产出 = 50 * (当前库存)^0.8。阻尼复利。",
-        BASE_COST: 5000000000, // 5B Bio
-        GROWTH: 2.00, // 极高成本增长
+        DESC: "星球吞噬。产出 = 50 * (当前库存)^0.8。",
+        BASE_COST: 5000000000, 
+        GROWTH: 2.00, 
         POW_FACTOR: 0.8,
         COEFF: 50.0,
         COST_RESOURCE: 'biomass'
     },
     
-    // ==========================================
-    // 能量转化设施 (Energy Conversion)
-    // ==========================================
-    SAC: {
-        NAME: "发酵囊 (Fermentation Sac)",
-        DESC: "基础转化：60 Bio -> 1 Enz。",
-        BASE_COST: 8000,
-        GROWTH: 1.15,
-        INPUT: 60, // 降低门槛 (原100)，防止T1资源枯竭
-        OUTPUT: 1,
-        COST_RESOURCE: 'biomass'
-    },
-    PUMP: {
-        NAME: "回流泵 (Reflux Pump)",
-        DESC: "效率优化：减少发酵囊 3 消耗。",
-        BASE_COST: 2500,
-        GROWTH: 1.25,
-        COST_REDUCTION: 3,
-        MIN_COST: 10,
-        COST_RESOURCE: 'enzymes'
-    },
-    CRACKER: {
-        NAME: "热能裂解堆 (Thermal Cracker)",
-        DESC: "高压裂变：400 Bio -> 30 Enz (产生热量)。",
-        BASE_COST: 25000,
-        GROWTH: 1.20,
-        INPUT: 400,
-        OUTPUT: 30, // 转化比 13.3:1 (优于Sac的60:1)
-        HEAT_GEN: 5,
-        COOL_RATE: 8,
-        COST_RESOURCE: 'enzymes'
-    },
-    BOILER: {
-        NAME: "血肉锅炉 (Flesh Boiler)",
-        DESC: "回收利用：1 幼虫 -> 800 Enz。",
-        BASE_COST: 100000,
-        GROWTH: 1.30,
-        INPUT_LARVA: 1,
-        OUTPUT_ENZ: 800,
-        COST_RESOURCE: 'enzymes'
-    },
     BLOOD_FUSION: {
         NAME: "鲜血聚变堆 (Blood Fusion)",
         DESC: "内循环。每秒吞噬 1 只近战兵种 -> 转化 2000 Enz。",
-        BASE_COST: 500000, // 500k Enz
+        BASE_COST: 500000, 
         GROWTH: 1.50,
         INPUT_UNIT: 'MELEE',
         OUTPUT_ENZ: 2000,
@@ -213,7 +196,7 @@ export const METABOLISM_FACILITIES = {
     RESONATOR: {
         NAME: "突触谐振塔 (Synaptic Resonator)",
         DESC: "大数定律。产出 = √总人口 * 500。",
-        BASE_COST: 10000000, // 10M Enz
+        BASE_COST: 10000000, 
         GROWTH: 1.45,
         POP_SCALAR: 500,
         COST_RESOURCE: 'enzymes'
@@ -221,7 +204,7 @@ export const METABOLISM_FACILITIES = {
     ENTROPY_VENT: {
         NAME: "熵增排放口 (Entropy Vent)",
         DESC: "双曲贴现。每秒燃烧 1% Bio库存 -> 5x 等价 Enz。",
-        BASE_COST: 1000000000, // 1B Enz
+        BASE_COST: 1000000000, 
         GROWTH: 2.50,
         BURN_RATE: 0.01,
         CONVERT_RATIO: 5.0,
@@ -229,21 +212,22 @@ export const METABOLISM_FACILITIES = {
     },
 
     // ==========================================
-    // 资讯设施 (Data)
+    // DATA (DNA)
     // ==========================================
     SPIRE: {
         NAME: "神经尖塔 (Neural Spire)",
-        DESC: "基础解析：产生微量 DNA。",
+        DESC: "基础解析：产生微量 DNA (0.005/s)。",
         BASE_COST: 5000,
         GROWTH: 1.25,
-        BASE_RATE: 0.02,
+        BASE_RATE: 0.005,
         COST_RESOURCE: 'enzymes'
     },
     HIVE_MIND: {
         NAME: "虫群意识网 (Hive Mind)",
-        DESC: "思维共鸣：产出 = 0.2 * 数量 * √总兵力。",
-        BASE_COST: 25000,
+        DESC: "思维共鸣：产出 = 0.001 * √总兵力。",
+        BASE_COST: 50000,
         GROWTH: 1.40,
+        SCALAR: 0.001,
         COST_RESOURCE: 'enzymes'
     },
     RECORDER: {
@@ -299,120 +283,84 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     id: UnitType.MELEE,
     name: '跳虫 (Zergling)',
     baseStats: {
-        hp: 60,
-        damage: 15,
-        range: 30,
-        speed: 180,
-        attackSpeed: 0.4,
-        width: 24,
-        height: 24,
-        color: 0x3b82f6,
-        armor: 0
+        hp: 60, damage: 15, range: 30, speed: 180, attackSpeed: 0.4,
+        width: 24, height: 24, color: 0x3b82f6, armor: 0
     },
     baseCost: { biomass: 15, larva: 1, dna: 0, time: 2.0 },
     growthFactors: { hp: 0.2, damage: 0.2 },
     baseLoadCapacity: 30,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
-    elementConfig: { type: 'PHYSICAL' }
+    elementConfig: { type: 'PHYSICAL' },
+    geneIds: ['GENE_MELEE_ATTACK', 'GENE_SWARM_MOVEMENT']
   },
   [UnitType.RANGED]: {
     id: UnitType.RANGED,
     name: '刺蛇 (Hydralisk)',
     baseStats: {
-        hp: 45,
-        damage: 30,
-        range: 220,
-        speed: 130,
-        attackSpeed: 1.0,
-        width: 20,
-        height: 30,
-        color: 0x8b5cf6,
-        armor: 5
+        hp: 45, damage: 30, range: 220, speed: 130, attackSpeed: 1.0,
+        width: 20, height: 30, color: 0x8b5cf6, armor: 5
     },
     baseCost: { biomass: 25, larva: 1, dna: 0, time: 4.0 },
     growthFactors: { hp: 0.15, damage: 0.25 },
     baseLoadCapacity: 30,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'FUNCTION' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
-    elementConfig: { type: 'TOXIN', statusPerHit: 10 }
+    elementConfig: { type: 'TOXIN', statusPerHit: 10 },
+    geneIds: ['GENE_RANGED_ATTACK', 'GENE_ELEMENTAL_HIT']
   },
   [UnitType.PYROVORE]: {
     id: UnitType.PYROVORE,
     name: '爆裂虫 (Pyrovore)',
     baseStats: {
-        hp: 120,
-        damage: 45,
-        range: 280,
-        speed: 90,
-        attackSpeed: 0.8,
-        width: 28,
-        height: 28,
-        color: 0xf87171, // Red
-        armor: 5
+        hp: 120, damage: 45, range: 280, speed: 90, attackSpeed: 0.8,
+        width: 28, height: 28, color: 0xf87171, armor: 5
     },
     baseCost: { biomass: 60, larva: 1, dna: 0, time: 5.0 },
     growthFactors: { hp: 0.15, damage: 0.3 },
     baseLoadCapacity: 40,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }],
-    elementConfig: { type: 'THERMAL', statusPerHit: 20 }
+    elementConfig: { type: 'THERMAL', statusPerHit: 20 },
+    geneIds: ['GENE_ARTILLERY_ATTACK', 'GENE_ELEMENTAL_HIT']
   },
   [UnitType.CRYOLISK]: {
     id: UnitType.CRYOLISK,
     name: '冰牙兽 (Cryolisk)',
     baseStats: {
-        hp: 180,
-        damage: 12,
-        range: 40,
-        speed: 220,
-        attackSpeed: 2.5,
-        width: 22,
-        height: 22,
-        color: 0x60a5fa, // Blue
-        armor: 10
+        hp: 180, damage: 12, range: 40, speed: 220, attackSpeed: 2.5, // High APM
+        width: 22, height: 22, color: 0x60a5fa, armor: 10
     },
     baseCost: { biomass: 40, larva: 1, dna: 0, time: 3.0 },
     growthFactors: { hp: 0.2, damage: 0.1 },
     baseLoadCapacity: 35,
     slots: [{ polarity: 'FUNCTION' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }],
-    elementConfig: { type: 'CRYO', statusPerHit: 8 }
+    elementConfig: { type: 'CRYO', statusPerHit: 8 },
+    geneIds: ['GENE_MELEE_ATTACK', 'GENE_ELEMENTAL_HIT', 'GENE_FAST_MOVEMENT']
   },
   [UnitType.OMEGALIS]: {
     id: UnitType.OMEGALIS,
     name: '雷兽 (Omegalis)',
     baseStats: {
-        hp: 800,
-        damage: 30,
-        range: 50,
-        speed: 70,
-        attackSpeed: 0.6,
-        width: 45,
-        height: 45,
-        color: 0xfacc15, // Yellow
-        armor: 60
+        hp: 800, damage: 30, range: 50, speed: 70, attackSpeed: 0.6,
+        width: 45, height: 45, color: 0xfacc15, armor: 60
     },
-    baseCost: { biomass: 300, larva: 2, dna: 10, time: 15.0 }, // Reduced DNA to 10
+    baseCost: { biomass: 300, larva: 2, dna: 10, time: 15.0 }, 
     growthFactors: { hp: 0.4, damage: 0.1 },
     baseLoadCapacity: 80,
     slots: [{ polarity: 'DEFENSE' }, { polarity: 'DEFENSE' }, { polarity: 'UNIVERSAL' }, { polarity: 'UNIVERSAL' }],
-    elementConfig: { type: 'VOLTAIC', statusPerHit: 25 }
+    elementConfig: { type: 'VOLTAIC', statusPerHit: 25 },
+    geneIds: ['GENE_CLEAVE_ATTACK', 'GENE_ELEMENTAL_HIT', 'GENE_REGEN']
   },
   [UnitType.QUEEN]: {
     id: UnitType.QUEEN,
     name: '虫后 (Queen)',
     baseStats: {
-        hp: 300,
-        damage: 10,
-        range: 100,
-        speed: 50,
-        attackSpeed: 1.0,
-        width: 32,
-        height: 48,
-        color: 0xd946ef, 
-        armor: 20
+        hp: 300, damage: 10, range: 100, speed: 50, attackSpeed: 1.0,
+        width: 32, height: 48, color: 0xd946ef, armor: 20
     },
-    baseCost: { biomass: 150, larva: 1, dna: 0, time: 10.0 }, // REMOVED DNA COST TO FIX EARLY GAME LOCK
+    baseCost: { biomass: 150, larva: 1, dna: 0, time: 10.0 }, 
     growthFactors: { hp: 0.1, damage: 0.1 },
     baseLoadCapacity: 50,
-    slots: [{ polarity: 'UNIVERSAL' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }]
+    slots: [{ polarity: 'UNIVERSAL' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }],
+    geneIds: ['GENE_RANGED_ATTACK', 'GENE_REGEN']
   },
   // Humans
   [UnitType.HUMAN_MARINE]: {
@@ -420,35 +368,40 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       name: '步枪兵 (Marine)',
       baseStats: { hp: 80, damage: 15, range: 200, speed: 0, attackSpeed: 1.0, width: 20, height: 32, color: 0x9ca3af, armor: 10 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
-      elementConfig: { type: 'PHYSICAL' }
+      elementConfig: { type: 'PHYSICAL' },
+      geneIds: ['GENE_RANGED_ATTACK']
   },
   [UnitType.HUMAN_RIOT]: {
       id: UnitType.HUMAN_RIOT,
       name: '防暴盾卫 (Riot)',
       baseStats: { hp: 300, damage: 10, range: 50, speed: 0, attackSpeed: 1.5, width: 30, height: 34, color: 0x1e3a8a, armor: 50 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
-      elementConfig: { type: 'PHYSICAL' }
+      elementConfig: { type: 'PHYSICAL' },
+      geneIds: ['GENE_MELEE_ATTACK']
   },
   [UnitType.HUMAN_PYRO]: {
       id: UnitType.HUMAN_PYRO,
       name: '火焰兵 (Pyro)',
       baseStats: { hp: 150, damage: 5, range: 120, speed: 0, attackSpeed: 0.1, width: 24, height: 32, color: 0xea580c, armor: 20 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
-      elementConfig: { type: 'THERMAL', statusPerHit: 5 } // High tick rate means fast stacking
+      elementConfig: { type: 'THERMAL', statusPerHit: 5 },
+      geneIds: ['GENE_RANGED_ATTACK', 'GENE_ELEMENTAL_HIT']
   },
   [UnitType.HUMAN_SNIPER]: {
       id: UnitType.HUMAN_SNIPER,
       name: '狙击手 (Sniper)',
       baseStats: { hp: 60, damage: 100, range: 500, speed: 0, attackSpeed: 3.5, width: 18, height: 30, color: 0x166534, armor: 5 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
-      elementConfig: { type: 'PHYSICAL' }
+      elementConfig: { type: 'PHYSICAL' },
+      geneIds: ['GENE_RANGED_ATTACK']
   },
   [UnitType.HUMAN_TANK]: {
       id: UnitType.HUMAN_TANK,
       name: '步行机甲 (Mech)',
       baseStats: { hp: 1500, damage: 60, range: 250, speed: 0, attackSpeed: 2.0, width: 50, height: 60, color: 0x475569, armor: 80 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
-      elementConfig: { type: 'VOLTAIC', statusPerHit: 25 }
+      elementConfig: { type: 'VOLTAIC', statusPerHit: 25 },
+      geneIds: ['GENE_RANGED_ATTACK', 'GENE_ELEMENTAL_HIT']
   }
 };
 

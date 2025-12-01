@@ -1,5 +1,4 @@
 
-
 import { GameSaveData, UnitType, UnitRuntimeStats, Resources, GameModifiers, BioPluginConfig, PluginInstance, ElementType } from '../types';
 import { INITIAL_GAME_STATE, UNIT_CONFIGS, UNIT_UPGRADE_COST_BASE, RECYCLE_REFUND_RATE, METABOLISM_FACILITIES, MAX_RESOURCES_BASE, BIO_PLUGINS, CAP_UPGRADE_BASE, EFFICIENCY_UPGRADE_BASE, QUEEN_UPGRADE_BASE, INITIAL_LARVA_CAP, CLICK_CONFIG } from '../constants';
 
@@ -194,8 +193,8 @@ export class DataManager {
 
         // ================= MATTER (BIOMASS) =================
         
-        // T1: Villi (Cluster Effect)
-        const clusterMult = Math.pow(1.25, Math.floor(meta.villiCount / 50));
+        // T1: Villi (Cluster Effect: +25% per 100)
+        const clusterMult = Math.pow(1.25, Math.floor(meta.villiCount / 100));
         const villiBase = conf.VILLI.BASE_RATE + (meta.taprootCount * conf.TAPROOT.BONUS_TO_VILLI);
         const villiProd = meta.villiCount * villiBase * clusterMult;
         bioRate += villiProd;
@@ -348,7 +347,7 @@ export class DataManager {
         // T2: Hive Mind
         if (meta.hiveMindCount > 0) {
             const totalPop = this.getTotalStockpile();
-            const hiveGen = meta.hiveMindCount * Math.sqrt(Math.max(1, totalPop)) * 0.2 * dt;
+            const hiveGen = meta.hiveMindCount * Math.sqrt(Math.max(1, totalPop)) * conf.HIVE_MIND.SCALAR * dt;
             dnaRate += hiveGen / dt;
             this.modifyResource('dna', hiveGen);
         }

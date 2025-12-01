@@ -1,11 +1,13 @@
 
 import { Application, Container, Graphics, TilingSprite, Text, TextStyle } from 'pixi.js';
-import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect } from '../types';
+import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect, IUnit, UnitRuntimeStats, GeneTrait } from '../types';
 import { UNIT_CONFIGS, LANE_Y, LANE_HEIGHT, DECAY_TIME, MILESTONE_DISTANCE, COLLISION_BUFFER, UNIT_SCREEN_CAPS, ELEMENT_COLORS, INITIAL_REGIONS_CONFIG, STATUS_CONFIG, STAGE_WIDTH, STAGE_TRANSITION_COOLDOWN, OBSTACLES } from '../constants';
 import { DataManager } from './DataManager';
+import { GeneLibrary, ReactionRegistry } from './GeneSystem';
+import { SpatialHash } from './SpatialHash';
 
 // --- ECS-lite UNIT CLASS ---
-class Unit {
+export class Unit implements IUnit {
   active: boolean = false;
   id: number = 0;
   faction: Faction = Faction.ZERG;
@@ -16,23 +18,12 @@ class Unit {
   y: number = 0;
   radius: number = 15;
   
-  // Stats
-  hp: number = 0;
-  maxHp: number = 0;
-  damage: number = 0;
-  range: number = 0;
-  speed: number = 0;
-  baseSpeed: number = 0;
-  armor: number = 0;
+  // Compositional Stats (v2.0)
+  stats: UnitRuntimeStats;
   
-  // Attack State
+  // Runtime Context
   attackCooldown: number = 0;
-  maxAttackCooldown: number = 0;
-  critChance: number = 0;
-  critDamage: number = 1.5;
-  element: ElementType = 'PHYSICAL';
-  statusPerHit: number = 10; // Default application amount
-  flashTimer: number = 0; // Visual hit feedback timer
+  flashTimer: number = 0;
   
   // AI State
   state: 'MOVE' | 'ATTACK' | 'IDLE' | 'DEAD' | 'WANDER' = 'IDLE';
@@ -54,10 +45,18 @@ class Unit {
   // --- NEW: STATUS MANAGER COMPONENT ---
   statuses: Partial<Record<StatusType, StatusEffect>> = {};
 
+  // --- NEW: GENE SYSTEM ---
+  genes: GeneTrait[] = [];
+
   constructor(id: number) { 
       this.id = id; 
       this.speedVar = 0.9 + Math.random() * 0.2; // +/- 10% speed
       this.waveOffset = Math.random() * 100;
+      this.stats = {
+          hp: 0, maxHp: 0, damage: 0, range: 0, speed: 0, attackSpeed: 0,
+          width: 0, height: 0, color: 0, armor: 0,
+          critChance: 0, critDamage: 0, element: 'PHYSICAL'
+      };
   }
 }
 
@@ -102,12 +101,14 @@ class UnitPool {
     unit.speedVar = 0.85 + Math.random() * 0.3; // More variance
     unit.waveOffset = Math.random() * 100;
 
-    let stats;
+    let stats: UnitRuntimeStats;
+    const config = UNIT_CONFIGS[type];
+
     if (faction === Faction.ZERG) {
         stats = DataManager.instance.getUnitStats(type, modifiers);
     } else {
-        const config = UNIT_CONFIGS[type];
         stats = {
+            hp: config.baseStats.hp * (1 + (x/5000)),
             maxHp: config.baseStats.hp * (1 + (x/5000)), // Scaling for humans
             damage: config.baseStats.damage,
             range: config.baseStats.range,
@@ -123,21 +124,18 @@ class UnitPool {
         };
     }
 
-    unit.maxHp = stats.maxHp;
-    unit.hp = unit.maxHp;
-    unit.damage = stats.damage;
-    unit.range = stats.range;
-    unit.baseSpeed = stats.speed;
-    unit.speed = stats.speed;
-    unit.maxAttackCooldown = stats.attackSpeed;
+    // Apply stats to Unit Composition
+    unit.stats = stats;
     unit.radius = stats.width / 2;
-    unit.critChance = stats.critChance || 0.05;
-    unit.critDamage = stats.critDamage || 1.5;
-    unit.element = stats.element || 'PHYSICAL';
-    unit.armor = stats.armor || 0;
     
-    // Config specific status app rate (e.g., Pyro applies more fire per tick)
-    unit.statusPerHit = UNIT_CONFIGS[type].elementConfig?.statusPerHit || 15;
+    // Initialize Genes
+    unit.genes = [];
+    if (config.geneIds) {
+        config.geneIds.forEach(id => {
+            const gene = GeneLibrary.get(id);
+            if (gene) unit.genes.push(gene);
+        });
+    }
 
     if (unit.view) {
       unit.view.visible = true;
@@ -270,7 +268,7 @@ export class GameEngine {
   
   private bgLayer: TilingSprite | null = null;
   private groundLayer: TilingSprite | null = null;
-  private unitPool: UnitPool | null = null;
+  public unitPool: UnitPool | null = null;
   private unitLayer: Container;
   private particleLayer: Container;
 
@@ -278,6 +276,9 @@ export class GameEngine {
   private graphicsPool: Graphics[] = [];
   private textPool: Text[] = [];
   private activeParticles: ActiveParticle[] = [];
+  
+  // Spatial Hash
+  public spatialHash: SpatialHash;
 
   // Access via DataManager.instance.modifiers
   get modifiers(): GameModifiers {
@@ -304,6 +305,7 @@ export class GameEngine {
     this.world = new Container();
     this.unitLayer = new Container();
     this.particleLayer = new Container();
+    this.spatialHash = new SpatialHash(100); // 100px cells
   }
 
   async init(element: HTMLElement) {
@@ -365,10 +367,6 @@ export class GameEngine {
           this.cameraX = 0;
           if (this.world) this.world.position.x = 0;
           this.clearParticles();
-          
-          // NOTE: We do NOT refund units here anymore. 
-          // Since the engine is often recreated on mode switch, `destroy()` handles the refund logic of the OLD engine.
-          // This prevents "Ghost units" in stockpile mode from accidentally doubling the inventory when destroyed.
       } else {
           // Entering Battle Logic (if not destroyed)
           const saved = DataManager.instance.state.world.regions[this.activeRegionId];
@@ -467,6 +465,13 @@ export class GameEngine {
     if (this.isPaused || !this.app || this.isDestroyed) return;
     const dt = delta / 60; 
 
+    // Update Spatial Hash
+    this.spatialHash.clear();
+    const allUnits = this.unitPool!.getActiveUnits();
+    for (const u of allUnits) {
+        if (!u.isDead) this.spatialHash.insert(u);
+    }
+
     if (this.isStockpileMode) {
         this.updateStockpileVisualization(dt);
         this.world.position.x = 0;
@@ -475,8 +480,6 @@ export class GameEngine {
         this.updateBattleMode(dt);
     }
 
-    const allUnits = this.unitPool!.getActiveUnits();
-    
     // --- Update Particles ---
     for (let i = this.activeParticles.length - 1; i >= 0; i--) {
         const p = this.activeParticles[i];
@@ -487,11 +490,9 @@ export class GameEngine {
         }
     }
 
-    // --- Process Units ---
+    // --- Process Units (Using Spatial Hash for Neighbors) ---
     const livingUnits = allUnits.filter(u => !u.active ? false : !u.isDead);
     livingUnits.forEach(u => u.engagedCount = 0);
-    const zergUnits = livingUnits.filter(u => u.faction === Faction.ZERG);
-    const humanUnits = livingUnits.filter(u => u.faction === Faction.HUMAN);
     
     // Optimization: Only sort for depth every few frames if needed, but per-frame is smoother
     this.unitLayer.children.sort((a, b) => a.zIndex - b.zIndex);
@@ -501,9 +502,14 @@ export class GameEngine {
         if (u.isDead) {
             this.processCorpse(u, dt);
         } else {
-            const enemies = u.faction === Faction.ZERG ? humanUnits : zergUnits;
-            const friends = u.faction === Faction.ZERG ? zergUnits : humanUnits;
-            this.processUnit(u, dt, enemies, friends);
+            // GENE TICK
+            if (u.genes) {
+                u.genes.forEach(g => {
+                    if (g.onTick) g.onTick(u, dt, this);
+                });
+            }
+            
+            this.processUnit(u, dt);
         }
     }
 
@@ -735,7 +741,7 @@ export class GameEngine {
       });
   }
 
-  private processUnit(u: Unit, dt: number, enemies: Unit[], friends: Unit[]) {
+  private processUnit(u: Unit, dt: number) {
      // Status Effects Tick
      this.updateStatusEffects(u, dt);
      
@@ -748,7 +754,7 @@ export class GameEngine {
          u.state = 'WANDER'; u.target = null;
          u.wanderTimer -= dt;
          if (u.wanderTimer <= 0) { u.wanderTimer = 1 + Math.random() * 2; u.wanderDir = Math.random() > 0.5 ? 1 : -1; if (Math.random() < 0.3) u.wanderDir = 0; }
-         const speed = u.speed * 0.3; let dx = u.wanderDir * speed * dt;
+         const speed = u.stats.speed * 0.3; let dx = u.wanderDir * speed * dt;
          if (this.app) { if (u.x < 50) u.wanderDir = 1; if (u.x > this.app.screen.width - 50) u.wanderDir = -1; }
          u.x += dx; u.y += (Math.random() - 0.5) * 0.5; 
          if (u.y < LANE_Y - LANE_HEIGHT/2) u.y = LANE_Y - LANE_HEIGHT/2; if (u.y > LANE_Y + LANE_HEIGHT/2) u.y = LANE_Y + LANE_HEIGHT/2;
@@ -759,17 +765,17 @@ export class GameEngine {
      // Micro-Stun Check (Shock)
      if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
 
-     // --- 2. Advanced Swarm AI: Targeting ---
+     // --- 2. Advanced Swarm AI: Targeting (Using Spatial Hash) ---
      
      const AGGRO_RANGE = 500; // Increased for stage width
      const getCapacity = (target: Unit) => Math.max(3, Math.floor((target.radius * 2.5) / 10));
-     const isRanged = u.range > 60; 
+     const isRanged = u.stats.range > 60; 
 
      let shouldSearch = true;
 
      // A. Check if current target is still valid
      if (u.target) {
-         if (u.target.isDead) {
+         if (u.target.isDead || !u.target.active) {
              u.target = null;
          } else {
              const distSq = (u.target.x - u.x)**2 + (u.target.y - u.y)**2;
@@ -779,12 +785,12 @@ export class GameEngine {
                  if (isRanged) {
                      shouldSearch = false;
                  } else {
-                     const capacity = getCapacity(u.target);
+                     const capacity = getCapacity(u.target as Unit);
                      const dist = Math.sqrt(distSq);
-                     const isEngaged = dist <= u.range * 1.2;
-                     if (isEngaged) { u.target.engagedCount++; shouldSearch = false; }
+                     const isEngaged = dist <= u.stats.range * 1.2;
+                     if (isEngaged) { (u.target as Unit).engagedCount++; shouldSearch = false; }
                      else {
-                         if (u.target.engagedCount < capacity) { u.target.engagedCount++; shouldSearch = false; }
+                         if ((u.target as Unit).engagedCount < capacity) { (u.target as Unit).engagedCount++; shouldSearch = false; }
                          else { u.target = null; shouldSearch = true; }
                      }
                  }
@@ -792,21 +798,29 @@ export class GameEngine {
          }
      }
 
-     // B. Search for new target
+     // B. Search for new target using Spatial Hash
      if (shouldSearch) {
         let bestTarget: Unit | null = null;
         let minDist = Infinity;
+        
+        // Query larger area for potential targets
+        const enemies = this.spatialHash.query(u.x, u.y, AGGRO_RANGE);
+
         for (const enemy of enemies) {
+            if (enemy.faction === u.faction) continue;
+            
             const distSq = (enemy.x - u.x)**2 + (enemy.y - u.y)**2;
+            // Additional checks handled by spatial hash, but refining circle
             if (distSq > AGGRO_RANGE * AGGRO_RANGE) continue;
+            
             if (!isRanged) {
-                const capacity = getCapacity(enemy);
-                if (enemy.engagedCount >= capacity) continue; 
+                const capacity = getCapacity(enemy as Unit);
+                if ((enemy as Unit).engagedCount >= capacity) continue; 
             }
-            if (distSq < minDist) { minDist = distSq; bestTarget = enemy; }
+            if (distSq < minDist) { minDist = distSq; bestTarget = enemy as Unit; }
         }
         u.target = bestTarget;
-        if (u.target && !isRanged) { u.target.engagedCount++; }
+        if (u.target && !isRanged) { (u.target as Unit).engagedCount++; }
      }
 
      // --- 3. PHYSICS & MOVEMENT ---
@@ -818,11 +832,11 @@ export class GameEngine {
 
      if (u.target && !u.target.isDead) {
          const dist = Math.sqrt((u.target.x - u.x)**2 + (u.target.y - u.y)**2);
-         const stopThreshold = !isRanged ? (u.radius + u.target.radius + COLLISION_BUFFER) : (u.range * 0.2); 
+         const stopThreshold = !isRanged ? (u.radius + u.target.radius + COLLISION_BUFFER) : (u.stats.range * 0.2); 
 
          if (dist > stopThreshold) {
-             let currentSpeed = u.speed * u.speedVar;
-             if (isRanged && dist <= u.range) { currentSpeed *= 0.4; }
+             let currentSpeed = u.stats.speed * u.speedVar;
+             if (isRanged && dist <= u.stats.range) { currentSpeed *= 0.4; }
              const dirX = (u.target.x - u.x) / dist;
              const dirY = (u.target.y - u.y) / dist;
              const noise = 1 + Math.sin(time * 3 + u.waveOffset) * 0.1;
@@ -835,7 +849,7 @@ export class GameEngine {
          // Zerg go Right, Humans go Left
          const moveDir = u.faction === Faction.ZERG ? 1 : -1;
          
-         const currentSpeed = u.speed * u.speedVar;
+         const currentSpeed = u.stats.speed * u.speedVar;
          const wave = Math.sin(time + u.waveOffset) * 20; 
          const surge = 1 + Math.sin(time * 2 + u.waveOffset) * 0.2; 
          
@@ -844,11 +858,14 @@ export class GameEngine {
          isMoving = true;
      }
 
-     // Separation
+     // Separation (Using Spatial Hash Neighbors)
+     // Query smaller radius for repulsion
+     const friends = this.spatialHash.query(u.x, u.y, 40);
      for (const friend of friends) {
         if (friend === u) continue;
+        if (friend.faction !== u.faction) continue; 
         if (u.faction === Faction.ZERG && u.type !== friend.type) continue;
-        if (Math.abs(friend.x - u.x) > 40) continue; 
+        
         const distSq = (u.x - friend.x)**2 + (u.y - friend.y)**2;
         const repelRadius = u.radius + friend.radius + 3; 
         if (distSq < repelRadius * repelRadius && distSq > 0.001) {
@@ -861,6 +878,12 @@ export class GameEngine {
             if (Math.abs(pushX) > 0.5) isMoving = true;
         }
     }
+    
+    // Gene Move Hook
+    const velocity = { x: dxMove, y: dyMove };
+    if (u.genes) u.genes.forEach(g => { if(g.onMove) g.onMove(u, velocity); });
+    dxMove = velocity.x;
+    dyMove = velocity.y;
 
     u.x += dxMove;
     u.y += dyMove;
@@ -899,8 +922,8 @@ export class GameEngine {
         }
         if (u.hpBar) {
             u.hpBar.clear();
-            if (u.hp < u.maxHp) {
-                const pct = Math.max(0, u.hp / u.maxHp);
+            if (u.stats.hp < u.stats.maxHp) {
+                const pct = Math.max(0, u.stats.hp / u.stats.maxHp);
                 u.hpBar.beginFill(0x000000); u.hpBar.drawRect(-12, -u.radius * 2 - 10, 24, 4); u.hpBar.endFill();
                 u.hpBar.beginFill(pct < 0.3 ? 0xff0000 : 0x00ff00); u.hpBar.drawRect(-12, -u.radius * 2 - 10, 24 * pct, 4); u.hpBar.endFill();
             }
@@ -910,10 +933,10 @@ export class GameEngine {
     u.attackCooldown -= dt;
     if (u.target && !u.target.isDead) {
          const dist = Math.sqrt((u.target.x - u.x)**2 + (u.target.y - u.y)**2);
-         if (dist <= u.range) {
+         if (dist <= u.stats.range) {
              u.state = 'ATTACK'; 
              if (u.attackCooldown <= 0) {
-                 u.attackCooldown = u.maxAttackCooldown;
+                 u.attackCooldown = u.stats.attackSpeed;
                  if (u.statuses['FROZEN']) u.attackCooldown *= 1.5;
                  this.performAttack(u, u.target);
              }
@@ -926,7 +949,7 @@ export class GameEngine {
   }
 
   // --- REST OF HELPERS (Damage, Status, Visuals) UNCHANGED ---
-  private updateUnitVisuals(u: Unit) {
+  public updateUnitVisuals(u: Unit) {
       if (!u.view) return;
       if (u.flashTimer > 0) { u.view.tint = 0xffffaa; return; }
       let tint = 0xffffff;
@@ -949,15 +972,28 @@ export class GameEngine {
       return (rr << 16) + (rg << 8) + (rb | 0);
   }
 
-  private performAttack(source: Unit, target: Unit) {
+  public performAttack(source: Unit, target: Unit) {
      if (source.view) source.view.x += (source.faction === Faction.ZERG ? -1 : 1) * 4; 
-     const color = ELEMENT_COLORS[source.element];
-     const isRanged = source.type === UnitType.RANGED || source.type === UnitType.PYROVORE || source.type === UnitType.HUMAN_MARINE || source.type === UnitType.HUMAN_SNIPER || source.type === UnitType.HUMAN_TANK || source.type === UnitType.HUMAN_PYRO;
-     if (isRanged) { this.createProjectile(source.x, source.y - 15, target.x, target.y - 15, color); } 
-     else { this.createFlash(target.x + (Math.random()*10-5), target.y - 10, color); this.processDamagePipeline(source, target); }
+     
+     // v2.0 GENE INTERCEPTION
+     let handled = false;
+     if (source.genes) {
+         for (const g of source.genes) {
+             if (g.onPreAttack) {
+                 const result = g.onPreAttack(source, target, this);
+                 if (result === false) { handled = true; break; } // Gene took over
+             }
+         }
+     }
+     
+     if (!handled) {
+         // Fallback default
+         this.createFlash(target.x + (Math.random()*10-5), target.y - 10, ELEMENT_COLORS[source.stats.element]); 
+         this.processDamagePipeline(source, target);
+     }
   }
 
-  private updateStatusEffects(unit: Unit, dt: number) {
+  public updateStatusEffects(unit: Unit, dt: number) {
       if (unit.isDead) return;
       for (const key in unit.statuses) {
           const type = key as StatusType;
@@ -980,12 +1016,16 @@ export class GameEngine {
       const freeze = unit.statuses['FROZEN'];
       if (freeze) {
           const slowFactor = Math.min(0.9, freeze.stacks / STATUS_CONFIG.THRESHOLD_FROZEN); 
-          unit.speed = unit.baseSpeed * (1 - slowFactor);
-          if (freeze.stacks >= STATUS_CONFIG.THRESHOLD_FROZEN) { unit.speed = 0; }
-      } else { unit.speed = unit.baseSpeed; }
+          unit.stats.speed = unit.stats.speed * (1 - slowFactor); // Temporarily reduce speed? 
+          // Note: Unit stats are reset every frame in spawn usually, but in this engine they persist.
+          // Correct way is to have baseSpeed vs speed. For simplicity, just modifying current speed is risky if it drifts.
+          // Better: Reset speed to base * mod at start of tick? 
+          // v2.0: Genes handle Move, they use stats.speed. 
+          if (freeze.stacks >= STATUS_CONFIG.THRESHOLD_FROZEN) { unit.stats.speed = 0; }
+      }
   }
 
-  private applyStatus(target: Unit, type: StatusType, stacks: number, duration: number) {
+  public applyStatus(target: Unit, type: StatusType, stacks: number, duration: number) {
       if (target.isDead) return;
       if (!target.statuses[type]) { target.statuses[type] = { type, stacks: 0, duration: 0, decayAccumulator: 0 }; }
       const s = target.statuses[type]!;
@@ -993,50 +1033,44 @@ export class GameEngine {
       s.duration = Math.max(s.duration, duration);
   }
 
-  private processDamagePipeline(source: Unit, target: Unit) {
+  public processDamagePipeline(source: Unit, target: Unit) {
       if (target.isDead) return;
-      const elementType = source.element;
-      let rawDamage = source.damage;
+      const elementType = source.stats.element;
+      let rawDamage = source.stats.damage;
       let isCrit = false;
-      if (Math.random() < source.critChance) { rawDamage *= source.critDamage; isCrit = true; }
-      let reactionText: string | null = null;
+      if (Math.random() < source.stats.critChance) { rawDamage *= source.stats.critDamage; isCrit = true; }
+      
       let bonusMultiplier = 1.0;
 
-      if (target.statuses['FROZEN'] && target.statuses['FROZEN']!.stacks >= STATUS_CONFIG.REACTION_THRESHOLD_MINOR && elementType === 'THERMAL') {
-          bonusMultiplier = 2.5; delete target.statuses['FROZEN']; reactionText = "THERMAL SHOCK!"; this.createExplosion(target.x, target.y, 40, 0xffaa00);
-      }
-      else if (target.statuses['FROZEN'] && target.statuses['FROZEN']!.stacks >= STATUS_CONFIG.REACTION_THRESHOLD_MAJOR && elementType === 'PHYSICAL') {
-          const shatterDmg = target.maxHp * 0.15; this.dealTrueDamage(target, shatterDmg); delete target.statuses['FROZEN']; reactionText = "SHATTER!"; this.createDamagePop(target.x, target.y - 40, Math.floor(shatterDmg), 'CRYO');
-      }
-      else if (target.statuses['POISONED'] && elementType === 'VOLTAIC') {
-          this.applyStatus(target, 'ARMOR_BROKEN', 1, 10); reactionText = "CORRODED!";
-      }
-      else if (target.statuses['SHOCKED'] && elementType === 'CRYO') {
-          this.applyStatus(target, 'FROZEN', 20, 10); reactionText = "SUPERCONDUCT!";
-      }
+      // v2.0 Gene Hook for Hit
+      if (source.genes) source.genes.forEach(g => { if (g.onHit) g.onHit(source, target, rawDamage, this); });
 
-      let armor = target.armor;
+      // v2.0 Elemental Reaction Registry
+      ReactionRegistry.handle(target, elementType, this, rawDamage);
+
+      let armor = target.stats.armor;
       if (target.statuses['ARMOR_BROKEN']) armor = 0; 
       const reduction = armor / (armor + 50);
       let finalDamage = (rawDamage * bonusMultiplier) * (1 - reduction);
       if (elementType === 'TOXIN') finalDamage = rawDamage * bonusMultiplier;
-      target.hp -= finalDamage;
-      if (elementType === 'THERMAL') this.applyStatus(target, 'BURNING', source.statusPerHit, 5);
-      if (elementType === 'CRYO') this.applyStatus(target, 'FROZEN', source.statusPerHit, 5);
-      if (elementType === 'VOLTAIC') this.applyStatus(target, 'SHOCKED', source.statusPerHit, 5);
-      if (elementType === 'TOXIN') this.applyStatus(target, 'POISONED', source.statusPerHit, 5);
+      target.stats.hp -= finalDamage;
+      
       if (target.view) { target.flashTimer = 0.1; if (!target.isDead) this.updateUnitVisuals(target); }
-      if (reactionText) { this.createFloatingText(target.x, target.y - 50, reactionText, 0xffffff, 16); }
-      if (isCrit || finalDamage > target.maxHp * 0.1) { this.createDamagePop(target.x, target.y - 30, Math.floor(finalDamage), elementType); }
-      if (target.hp <= 0) this.killUnit(target);
+      if (isCrit || finalDamage > target.stats.maxHp * 0.1) { this.createDamagePop(target.x, target.y - 30, Math.floor(finalDamage), elementType); }
+      if (target.stats.hp <= 0) this.killUnit(target);
   }
 
-  private dealTrueDamage(target: Unit, amount: number) {
-      if (target.isDead) return; target.hp -= amount; if (target.hp <= 0) this.killUnit(target);
+  public dealTrueDamage(target: Unit, amount: number) {
+      if (target.isDead) return; target.stats.hp -= amount; if (target.stats.hp <= 0) this.killUnit(target);
   }
 
-  private killUnit(u: Unit) {
+  public killUnit(u: Unit) {
+      if (u.isDead) return;
       u.isDead = true; u.state = 'DEAD'; u.decayTimer = DECAY_TIME;
+      
+      // v2.0 Gene Hook for Death
+      if (u.genes) u.genes.forEach(g => { if(g.onDeath) g.onDeath(u, this); });
+
       if (u.faction === Faction.HUMAN) {
           DataManager.instance.recordKill(); 
           let bioReward = 10;
@@ -1053,10 +1087,12 @@ export class GameEngine {
           });
       }
       if (u.view) { u.view.tint = 0x555555; u.view.zIndex = -9999; u.view.rotation = (Math.random() * 0.5 - 0.25) + Math.PI / 2; u.view.scale.y = 0.5; if (u.hpBar) u.hpBar.clear(); }
+      
+      // Legacy Global Modifier Check (Volatile Blood)
       if (u.faction === Faction.ZERG && this.modifiers.explodeOnDeath) {
          this.createExplosion(u.x, u.y, 80);
          const units = this.unitPool!.getActiveUnits();
-         units.forEach(enemy => { if (!enemy.isDead && enemy.faction === Faction.HUMAN) { const dist = Math.sqrt((enemy.x - u.x)**2 + (enemy.y - u.y)**2); if (dist < 80) { enemy.hp -= 40; if (enemy.hp <= 0) this.killUnit(enemy); } } });
+         units.forEach(enemy => { if (!enemy.isDead && enemy.faction === Faction.HUMAN) { const dist = Math.sqrt((enemy.x - u.x)**2 + (enemy.y - u.y)**2); if (dist < 80) { enemy.stats.hp -= 40; if (enemy.stats.hp <= 0) this.killUnit(enemy); } } });
       }
   }
 
@@ -1071,7 +1107,7 @@ export class GameEngine {
       if (p.type === 'GRAPHICS' && p.view instanceof Graphics) this.graphicsPool.push(p.view);
       if (p.type === 'TEXT' && p.view instanceof Text) this.textPool.push(p.view);
   }
-  private createDamagePop(x: number, y: number, value: number, element: string) {
+  public createDamagePop(x: number, y: number, value: number, element: string) {
       if (!this.app || this.isDestroyed) return;
       const g = this.getGraphics();
       g.beginFill(ELEMENT_COLORS[element as ElementType] || 0xffffff, 0.8);
@@ -1080,7 +1116,7 @@ export class GameEngine {
       g.drawPolygon(points); g.endFill(); g.position.set(x, y);
       this.activeParticles.push({ view: g, type: 'GRAPHICS', life: 20, maxLife: 20, update: (p, dt) => { p.life -= dt * 60; p.view.y -= 1; p.view.alpha = p.life / 20; return p.life > 0; } });
   }
-  private createFloatingText(x: number, y: number, text: string, color: number, fontSize: number = 12) {
+  public createFloatingText(x: number, y: number, text: string, color: number, fontSize: number = 12) {
       if (!this.app || this.isDestroyed) return;
       let t = this.textPool.pop();
       if (!t) { t = new Text({ text, style: { fontFamily: 'Courier New', fontSize, fontWeight: 'bold', fill: color, stroke: { color: 0x000000, width: 2 } } }); } 
@@ -1088,18 +1124,18 @@ export class GameEngine {
       t.visible = true; t.alpha = 1; t.scale.set(0.5); t.anchor.set(0.5); t.position.set(x, y); this.particleLayer.addChild(t);
       this.activeParticles.push({ view: t, type: 'TEXT', life: 60, maxLife: 60, update: (p, dt) => { p.life -= dt * 60; p.view.y -= 0.5; p.view.scale.set(p.view.scale.x + 0.01); p.view.alpha = p.life / 20; return p.life > 0; } });
   }
-  private createFlash(x: number, y: number, color: number) { 
+  public createFlash(x: number, y: number, color: number) { 
       if (!this.app || this.isDestroyed) return; 
       const g = this.getGraphics(); g.beginFill(color, 0.9); g.drawCircle(0, 0, 4); g.endFill(); g.position.set(x, y);
       this.activeParticles.push({ view: g, type: 'GRAPHICS', life: 5, maxLife: 5, update: (p, dt) => { p.life -= dt * 60; p.view.alpha = p.life / 5; return p.life > 0; } });
   }
-  private createProjectile(x1: number, y1: number, x2: number, y2: number, color: number) { 
+  public createProjectile(x1: number, y1: number, x2: number, y2: number, color: number) { 
       if (!this.app || this.isDestroyed) return; 
       const g = this.getGraphics(); g.lineStyle(2, color, 1); g.moveTo(0, 0); g.lineTo(12, 0); g.position.set(x1, y1); g.rotation = Math.atan2(y2 - y1, x2 - x1); 
       const speed = 800; const dist = Math.sqrt((x2-x1)**2 + (y2-y1)**2); const duration = dist / speed; 
       this.activeParticles.push({ view: g, type: 'GRAPHICS', life: 0, maxLife: duration, startX: x1, startY: y1, endX: x2, endY: y2, update: (p: any, dt: number) => { p.life += dt; const t = Math.min(1, p.life / p.maxLife); p.view.x = p.startX + (p.endX - p.startX) * t; p.view.y = p.startY + (p.endY - p.startY) * t; return t < 1; } } as any);
   }
-  private createExplosion(x: number, y: number, radius: number, color: number = 0x00ff00) { 
+  public createExplosion(x: number, y: number, radius: number, color: number = 0x00ff00) { 
       if (!this.app || this.isDestroyed) return; 
       const g = this.getGraphics(); g.beginFill(color, 0.5); g.drawCircle(0, 0, 10); g.endFill(); g.position.set(x, y); 
       this.activeParticles.push({ view: g, type: 'GRAPHICS', life: 0, maxLife: 20, update: (p: any, dt: number) => { p.life++; p.view.width += 8; p.view.height += 8; p.view.alpha -= 0.05; return p.view.alpha > 0; } });

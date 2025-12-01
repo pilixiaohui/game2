@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { GameSaveData, UnitType, HiveSection, Polarity, GameStateSnapshot, RegionData } from '../types';
 import { UNIT_CONFIGS, METABOLISM_FACILITIES, BIO_PLUGINS, PLAYABLE_UNITS, CLICK_CONFIG } from '../constants';
@@ -156,7 +155,7 @@ export const HiveView: React.FC<HiveViewProps> = ({
         // Count mapping & Special Stats
         if (key === 'VILLI') { 
             count = meta.villiCount; 
-            const synergy = Math.pow(1.25, Math.floor(count/50));
+            const synergy = Math.pow(1.25, Math.floor(count/METABOLISM_FACILITIES.VILLI.CLUSTER_THRESHOLD));
             statText = (
                 <span>
                     Base: {(count * METABOLISM_FACILITIES.VILLI.BASE_RATE).toFixed(1)}/s <br/>
@@ -164,9 +163,9 @@ export const HiveView: React.FC<HiveViewProps> = ({
                 </span>
             );
         }
-        else if (key === 'TAPROOT') { count = meta.taprootCount; statText = `Buff: Villi Base +${(count * 2.0).toFixed(1)}`; }
+        else if (key === 'TAPROOT') { count = meta.taprootCount; statText = `Buff: Villi Base +${(count * METABOLISM_FACILITIES.TAPROOT.BONUS_TO_VILLI).toFixed(1)}`; }
         else if (key === 'GEYSER') { count = meta.geyserCount; statText = `Output: +${(count * METABOLISM_FACILITIES.GEYSER.BASE_RATE).toFixed(1)}/s`; }
-        else if (key === 'BREAKER') { count = meta.breakerCount; statText = `Out: +${(count * METABOLISM_FACILITIES.BREAKER.BASE_RATE).toFixed(0)} | Loss: ${(count * 0.02).toFixed(2)}%`; }
+        else if (key === 'BREAKER') { count = meta.breakerCount; statText = `Out: +${(count * METABOLISM_FACILITIES.BREAKER.BASE_RATE).toFixed(0)} | Loss: ${(count * METABOLISM_FACILITIES.BREAKER.LOSS_RATE * 100).toFixed(2)}%`; }
         else if (key === 'NECRO_SIPHON') { count = meta.necroSiphonCount || 0; statText = `Bonus per Kill: x${count * 10}`; }
         else if (key === 'RED_TIDE') { count = meta.redTideCount || 0; statText = `Synergy: ${(1 + meta.villiCount/50).toFixed(2)}x`; }
         else if (key === 'GAIA_DIGESTER') { count = meta.gaiaDigesterCount || 0; statText = `Factor: ${count * 50} (Damped)`; }
@@ -183,7 +182,7 @@ export const HiveView: React.FC<HiveViewProps> = ({
                 </span>
             ); 
         }
-        else if (key === 'PUMP') { count = meta.refluxPumpCount; statText = `Sac Cost: -${count * 3} Bio`; }
+        else if (key === 'PUMP') { count = meta.refluxPumpCount; statText = `Sac Cost: -${count * METABOLISM_FACILITIES.PUMP.COST_REDUCTION} Bio`; }
         else if (key === 'CRACKER') { 
             count = meta.thermalCrackerCount;
             const heatPct = meta.crackerHeat;
@@ -203,7 +202,7 @@ export const HiveView: React.FC<HiveViewProps> = ({
                 </div>
             );
         }
-        else if (key === 'BOILER') { count = meta.fleshBoilerCount; statText = `Conv: ${count} Larva -> ${count * 800} Enz`; }
+        else if (key === 'BOILER') { count = meta.fleshBoilerCount; statText = `Conv: ${count} Larva -> ${count * METABOLISM_FACILITIES.BOILER.OUTPUT_ENZ} Enz`; }
         else if (key === 'BLOOD_FUSION') { count = meta.bloodFusionCount || 0; statText = `Consumes Melee Units for Enz`; }
         else if (key === 'RESONATOR') { count = meta.synapticResonatorCount || 0; statText = `Scale: √Pop * ${count * 500}`; }
         else if (key === 'ENTROPY_VENT') { count = meta.entropyVentCount || 0; statText = `Burn 1% Bio -> 5x Enz`; }
@@ -226,7 +225,7 @@ export const HiveView: React.FC<HiveViewProps> = ({
                 </div>
             );
         }
-        else if (key === 'HIVE_MIND') { count = meta.hiveMindCount; statText = `Calc: +${(count * Math.sqrt(DataManager.instance.getTotalStockpile())).toFixed(2)} DNA/s`; }
+        else if (key === 'HIVE_MIND') { count = meta.hiveMindCount; statText = `Calc: +${(count * Math.sqrt(DataManager.instance.getTotalStockpile()) * METABOLISM_FACILITIES.HIVE_MIND.SCALAR).toFixed(3)} DNA/s`; }
         else if (key === 'RECORDER') { count = meta.akashicRecorderCount; statText = `Chance: ${Math.min(100, count * 15)}% to duplicate`; }
         else if (key === 'COMBAT_CORTEX') { count = meta.combatCortexCount || 0; statText = `Harvests Melee Aggression`; }
         else if (key === 'GENE_ARCHIVE') { count = meta.geneArchiveCount || 0; statText = `Unlocks Meta-Progression`; }

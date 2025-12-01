@@ -91,6 +91,9 @@ export interface UnitConfig {
         type: ElementType;
         statusPerHit?: number; // How many stacks applied per hit
     };
+    
+    // v2.0 Composition System
+    geneIds?: string[];
 }
 
 export interface PluginStatModifier {
@@ -288,4 +291,40 @@ export interface RegionData {
   devourProgress: number;
   isUnlocked: boolean;
   isFighting: boolean;
+}
+
+// --- v2.0 GENE SYSTEM INTERFACES ---
+
+export interface IUnit {
+    id: number;
+    active: boolean;
+    isDead: boolean;
+    type: UnitType;
+    faction: Faction;
+    x: number;
+    y: number;
+    radius: number;
+    
+    // Compositional Stats
+    stats: UnitRuntimeStats;
+    // Runtime Context
+    statuses: Partial<Record<StatusType, StatusEffect>>;
+    attackCooldown: number;
+    target: IUnit | null;
+    flashTimer: number;
+    
+    // System
+    view: any; // PIXI.Graphics
+}
+
+export interface GeneTrait {
+    id: string;
+    name: string;
+    
+    // Lifecycle Hooks
+    onTick?: (self: IUnit, dt: number, engine: any) => void;
+    onMove?: (self: IUnit, velocity: {x:number, y:number}) => void; // Modifies velocity in place if needed
+    onPreAttack?: (self: IUnit, target: IUnit, engine: any) => boolean; // Return false to cancel default melee
+    onHit?: (self: IUnit, target: IUnit, damage: number, engine: any) => void;
+    onDeath?: (self: IUnit, engine: any) => void;
 }
