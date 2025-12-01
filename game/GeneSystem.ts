@@ -115,26 +115,48 @@ export class GeneLibrary {
 GeneLibrary.register({
     id: 'GENE_ACQUIRE_TARGET',
     name: 'Targeting System',
-    onAcquireTarget: (self, potentialTargets, engine, params) => {
-        let bestDist = params.range ? params.range ** 2 : Infinity;
-        let bestTarget: IUnit | null = null;
-        
-        // Iterate potential targets from SpatialHash
-        const count = potentialTargets.length;
-        for (let i = 0; i < count; i++) {
-             const entity = potentialTargets[i];
-             if (entity.faction === self.faction || entity.isDead) continue;
-             
-             const dx = entity.x - self.x;
-             const dy = entity.y - self.y;
-             const distSq = dx*dx + dy*dy;
-             
-             if (distSq < bestDist) {
-                 bestDist = distSq;
-                 bestTarget = entity;
-             }
+    // Refactored to handle its own validation and spatial query
+    onUpdateTarget: (self, dt, engine, params) => {
+        const range = params.range || 600;
+        const rangeSq = range * range;
+
+        // 1. Validation
+        if (self.target) {
+            const t = self.target;
+            if (t.isDead || !t.active) {
+                self.target = null;
+            } else {
+                const distSq = (t.x - self.x)**2 + (t.y - self.y)**2;
+                if (distSq > rangeSq) {
+                    self.target = null;
+                }
+            }
         }
-        return bestTarget;
+
+        // 2. Acquisition
+        if (!self.target) {
+             const potentialTargets = engine._sharedQueryBuffer;
+             // Query spatial hash directly from Gene
+             const count = engine.spatialHash.query(self.x, self.y, range, potentialTargets);
+             
+             let bestDist = rangeSq;
+             let bestTarget: IUnit | null = null;
+             
+             for (let i = 0; i < count; i++) {
+                 const entity = potentialTargets[i];
+                 if (entity.faction === self.faction || entity.isDead) continue;
+                 
+                 const dx = entity.x - self.x;
+                 const dy = entity.y - self.y;
+                 const distSq = dx*dx + dy*dy;
+                 
+                 if (distSq < bestDist) {
+                     bestDist = distSq;
+                     bestTarget = entity;
+                 }
+             }
+             self.target = bestTarget;
+        }
     }
 });
 

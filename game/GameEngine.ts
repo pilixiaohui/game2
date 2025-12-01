@@ -23,6 +23,7 @@ export class Unit implements IUnit {
   // Runtime Context
   attackCooldown: number = 0;
   flashTimer: number = 0;
+  context: Record<string, any> = {};
   
   // AI State
   state: 'MOVE' | 'ATTACK' | 'IDLE' | 'DEAD' | 'WANDER' = 'IDLE';
@@ -98,6 +99,7 @@ class UnitPool {
     unit.target = null;
     unit.attackCooldown = 0;
     unit.statuses = {}; // Reset statuses
+    unit.context = {}; // Reset context blackboard
     unit.flashTimer = 0;
     
     // Reset AI props
@@ -222,6 +224,7 @@ class UnitPool {
     unit.active = false;
     unit.isDead = false;
     unit.geneConfig = []; // Clear ref
+    unit.context = {};
     if (unit.view) unit.view.visible = false;
     this.freeIndices.push(unit.id); // Return index to stack
   }
@@ -547,23 +550,14 @@ export class GameEngine implements IGameEngine {
 
      if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
 
-     // --- TARGETING SYSTEM (Gene Based) ---
-     const AGGRO_RANGE = 600;
-     const potentialTargets = this._sharedQueryBuffer;
-     this.spatialHash.query(u.x, u.y, AGGRO_RANGE, potentialTargets);
-
-     // 1. Validation
-     if (u.target && (u.target.isDead || !u.target.active || ((u.target.x-u.x)**2 > AGGRO_RANGE**2))) {
-         u.target = null;
-     }
-
-     // 2. Acquisition (Delegated to Gene)
-     if (!u.target && u.geneConfig) {
+     // --- TARGETING SYSTEM (Pure Gene Based) ---
+     // Removed hardcoded spatial query & range checks. 
+     // Logic is now fully encapsulated in GENE_ACQUIRE_TARGET (via onUpdateTarget)
+     if (u.geneConfig) {
          for (const cfg of u.geneConfig) {
              const gene = GeneLibrary.get(cfg.id);
-             if (gene && gene.onAcquireTarget) {
-                 const t = gene.onAcquireTarget(u, potentialTargets, this, cfg.params || {});
-                 if (t) { u.target = t; break; }
+             if (gene && gene.onUpdateTarget) {
+                 gene.onUpdateTarget(u, dt, this, cfg.params || {});
              }
          }
      }

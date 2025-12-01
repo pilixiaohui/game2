@@ -323,8 +323,8 @@ export interface GeneTrait {
     // Movement Logic
     onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine, params: any) => void; 
     
-    // Targeting Logic
-    onAcquireTarget?: (self: IUnit, potentialTargets: IUnit[], engine: IGameEngine, params: any) => IUnit | null;
+    // Targeting Logic (Refactored v2.1: Gene is fully responsible for query & validation)
+    onUpdateTarget?: (self: IUnit, dt: number, engine: IGameEngine, params: any) => void;
     
     // Combat Hooks
     onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine, params: any) => boolean; 
@@ -346,6 +346,7 @@ export interface IUnit {
     stats: UnitRuntimeStats;
     // Runtime Context
     statuses: Partial<Record<StatusType, StatusEffect>>;
+    context: Record<string, any>; // v2.1: Data Blackboard for Genes
     attackCooldown: number;
     target: IUnit | null;
     flashTimer: number;
