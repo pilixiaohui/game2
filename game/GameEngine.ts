@@ -551,7 +551,6 @@ export class GameEngine implements IGameEngine {
      if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
 
      // --- TARGETING SYSTEM (Pure Gene Based) ---
-     // Removed hardcoded spatial query & range checks. 
      // Logic is now fully encapsulated in GENE_ACQUIRE_TARGET (via onUpdateTarget)
      if (u.geneConfig) {
          for (const cfg of u.geneConfig) {
@@ -590,17 +589,7 @@ export class GameEngine implements IGameEngine {
      }
 
      // --- COMBAT SYSTEM ---
-     u.attackCooldown -= dt;
-     if (u.target && !u.target.isDead) {
-         const dist = Math.sqrt((u.target.x - u.x)**2 + (u.target.y - u.y)**2);
-         if (dist <= u.stats.range) {
-             u.state = 'ATTACK'; 
-             if (u.attackCooldown <= 0) {
-                 u.attackCooldown = u.stats.attackSpeed;
-                 this.performAttack(u, u.target);
-             }
-         }
-     }
+     // v2.2 Removed hardcoded loop. Logic is now in GENE_AUTO_ATTACK.
   }
 
   public updateUnitVisuals(u: IUnit) {

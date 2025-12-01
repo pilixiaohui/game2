@@ -130,8 +130,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_MELEE_ATTACK', params: {} },
-        // v2.1: Split Movement Genes
         { id: 'GENE_BASIC_MOVE', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 2.0, cohesionWeight: 0.2, alignmentWeight: 0.1 } }
     ]
@@ -150,6 +150,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x8b5cf6 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_BASIC_MOVE', params: {} },
@@ -170,6 +171,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 40 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_BASIC_MOVE', params: {} },
@@ -190,6 +192,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_FAST_MOVEMENT', params: { multiplier: 1.3 } },
@@ -215,6 +218,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_CLEAVE_ATTACK', params: { radius: 60, percentage: 0.5 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_REGEN', params: { rate: 0.05 } },
@@ -238,6 +242,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0xd946ef } },
         { id: 'GENE_REGEN', params: { rate: 0.1 } },
         { id: 'GENE_BASIC_MOVE', params: {} },
@@ -256,6 +261,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+          { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: {} }
       ]
   },
@@ -273,6 +279,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+          { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_MELEE_ATTACK', params: {} }
       ]
   },
@@ -287,6 +294,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+          { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 10 } }, 
           { id: 'GENE_ELEMENTAL_HIT', params: {} }
       ]
@@ -302,6 +310,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 600 } },
+          { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } }
       ]
   },
@@ -319,6 +328,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+          { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: {} },
           { id: 'GENE_ELEMENTAL_HIT', params: {} }
       ]

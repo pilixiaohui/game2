@@ -311,6 +311,7 @@ export interface IGameEngine {
     killUnit: (u: IUnit) => void;
     applyStatus: (target: IUnit, type: StatusType, stacks: number, duration: number) => void;
     processDamagePipeline: (source: IUnit, target: IUnit) => void;
+    performAttack: (source: IUnit, target: IUnit) => void;
 }
 
 export interface GeneTrait {

@@ -161,6 +161,38 @@ GeneLibrary.register({
 });
 
 GeneLibrary.register({
+    id: 'GENE_AUTO_ATTACK',
+    name: 'Auto Attack Trigger',
+    onTick: (self, dt, engine, params) => {
+        if (self.attackCooldown > 0) {
+            self.attackCooldown -= dt;
+        }
+
+        if (self.target && !self.target.isDead) {
+            const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
+            const rangeSq = self.stats.range * self.stats.range;
+            
+            // Check Range
+            if (distSq <= rangeSq) {
+                self.state = 'ATTACK';
+                
+                // Trigger Attack
+                if (self.attackCooldown <= 0) {
+                    // Reset cooldown (attackSpeed is actually Cooldown Time in current data model)
+                    self.attackCooldown = self.stats.attackSpeed; 
+                    engine.performAttack(self, self.target);
+                }
+            } else {
+                // Out of range, return to IDLE (so Movement gene can pick it up)
+                if (self.state === 'ATTACK') self.state = 'IDLE';
+            }
+        } else {
+             if (self.state === 'ATTACK') self.state = 'IDLE';
+        }
+    }
+});
+
+GeneLibrary.register({
     id: 'GENE_MELEE_ATTACK',
     name: 'Melee Strike',
     onPreAttack: (self, target, engine, params) => {
@@ -261,6 +293,11 @@ GeneLibrary.register({
     id: 'GENE_BASIC_MOVE',
     name: 'Basic Movement Intent',
     onMove: (self, velocity, dt, engine, params) => {
+        // v2.2 Combat State Check: Stop moving if attacking
+        if (self.state === 'ATTACK') return;
+
+        let isMoving = false;
+
         // Stockpile Mode: Wandering
         if (engine.isStockpileMode && self.faction === Faction.ZERG) {
             self.wanderTimer -= dt;
@@ -271,17 +308,20 @@ GeneLibrary.register({
             // Wander horizontally, slight vertical drift
             velocity.x += self.wanderDir * self.stats.speed * 0.3 * dt;
             velocity.y += (Math.random() - 0.5) * 0.5;
+            isMoving = true;
         } 
         // Battle Mode: Chase or March
         else if (self.target && !self.target.isDead) {
             // Chase logic
             const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
             const dist = Math.sqrt(distSq);
-            if (dist > self.stats.range * 0.8) {
+            // v2.2: Stop chasing if within range (Gene Auto Attack handles state switch, but we must stop velocity here)
+            if (dist > self.stats.range * 0.9) {
                 const dirX = (self.target.x - self.x) / dist;
                 const dirY = (self.target.y - self.y) / dist;
                 velocity.x += dirX * self.stats.speed * self.speedVar * dt;
                 velocity.y += dirY * self.stats.speed * self.speedVar * dt;
+                isMoving = true;
             }
         } 
         // March Logic (Default fallback)
@@ -291,8 +331,12 @@ GeneLibrary.register({
             if (self.stats.speed > 0) {
                 velocity.x += moveDir * self.stats.speed * self.speedVar * dt;
                 velocity.y += Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
+                isMoving = true;
             }
         }
+
+        if (isMoving) self.state = 'MOVE';
+        else if (self.state !== 'ATTACK') self.state = 'IDLE';
     }
 });
 
@@ -300,6 +344,8 @@ GeneLibrary.register({
     id: 'GENE_BOIDS',
     name: 'Boids Physics',
     onMove: (self, velocity, dt, engine, params) => {
+        if (self.state === 'ATTACK' || self.stats.speed <= 0) return;
+
         // Time Sliced with Sample & Hold
         const frame = Math.floor(Date.now() / 32); 
         const shouldUpdate = (frame + self.frameOffset) % 3 === 0;
