@@ -3,7 +3,9 @@ import { IUnit } from '../types';
 
 export class SpatialHash {
     private cellSize: number;
-    // Map<IntegerKey, Array> - Using number keys avoids string allocation per frame
+    // Map<IntegerKey, Array>
+    // Using number keys avoids string allocation.
+    // We maintain persistent arrays in the map to reuse them.
     private grid: Map<number, IUnit[]>;
 
     constructor(cellSize: number = 100) {
@@ -11,19 +13,13 @@ export class SpatialHash {
         this.grid = new Map();
     }
 
-    /**
-     * Generates a composite integer key.
-     * Limits:
-     * - Y must be < 1,000,000 (Lane height is ~200, so safe)
-     * - X must be within JS Safe Integer limits when combined.
-     *   Max Safe Integer is 9e15. 
-     *   If key = x + y * 1,000,000
-     *   Max x can be around 9e9 cells. 
-     *   9e9 cells * 100px = 9e11 pixels. Enough for "Endless".
-     */
     private getKey(x: number, y: number): number {
-        const cx = Math.floor(x / this.cellSize);
-        const cy = Math.floor(y / this.cellSize);
+        // Bitwise floor is slightly faster: x | 0
+        const cx = (x / this.cellSize) | 0;
+        const cy = (y / this.cellSize) | 0;
+        // Basic integer hashing.
+        // Assuming map is roughly 200px high (cy = 0 to 2) and X can go up to 120,000 (cx = 0 to 1200)
+        // 1,000,000 multiplier is safe for X up to ~9,000,000 before overlap with safe integer limits.
         return cx + cy * 1_000_000;
     }
 
@@ -59,10 +55,10 @@ export class SpatialHash {
         out.length = 0; // Clear without deallocating
         const radiusSq = radius * radius;
         
-        const startX = Math.floor((x - radius) / this.cellSize);
-        const endX = Math.floor((x + radius) / this.cellSize);
-        const startY = Math.floor((y - radius) / this.cellSize);
-        const endY = Math.floor((y + radius) / this.cellSize);
+        const startX = ((x - radius) / this.cellSize) | 0;
+        const endX = ((x + radius) / this.cellSize) | 0;
+        const startY = ((y - radius) / this.cellSize) | 0;
+        const endY = ((y + radius) / this.cellSize) | 0;
 
         for (let cx = startX; cx <= endX; cx++) {
             for (let cy = startY; cy <= endY; cy++) {
@@ -72,9 +68,13 @@ export class SpatialHash {
                     const len = cell.length;
                     for (let i = 0; i < len; i++) {
                         const unit = cell[i];
+                        // Optimization: Check if dead/inactive before math
                         if (!unit.active || unit.isDead) continue;
-                        const distSq = (unit.x - x) ** 2 + (unit.y - y) ** 2;
-                        if (distSq <= radiusSq) {
+                        
+                        const dx = unit.x - x;
+                        const dy = unit.y - y;
+                        // Avoid Math.pow for small performance boost in hot loop
+                        if ((dx * dx + dy * dy) <= radiusSq) {
                             out.push(unit);
                         }
                     }

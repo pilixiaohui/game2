@@ -1,6 +1,6 @@
 
 import { Application, Container, Graphics, TilingSprite, Text, TextStyle } from 'pixi.js';
-import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect, IUnit, UnitRuntimeStats, GeneTrait, IGameEngine } from '../types';
+import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect, IUnit, UnitRuntimeStats, GeneTrait, IGameEngine, GeneConfig } from '../types';
 import { UNIT_CONFIGS, LANE_Y, LANE_HEIGHT, DECAY_TIME, MILESTONE_DISTANCE, COLLISION_BUFFER, UNIT_SCREEN_CAPS, ELEMENT_COLORS, INITIAL_REGIONS_CONFIG, STATUS_CONFIG, STAGE_WIDTH, STAGE_TRANSITION_COOLDOWN, OBSTACLES } from '../constants';
 import { DataManager } from './DataManager';
 import { GeneLibrary, ReactionRegistry, StatusRegistry } from './GeneSystem';
@@ -35,7 +35,8 @@ export class Unit implements IUnit {
   wanderDir: number = 0;
   engagedCount: number = 0; 
   speedVar: number = 1.0;   
-  waveOffset: number = 0;   
+  waveOffset: number = 0;
+  frameOffset: number = 0;
   
   // Visuals
   view: Graphics | null = null;
@@ -43,12 +44,14 @@ export class Unit implements IUnit {
   
   // --- COMPONENTS ---
   statuses: Partial<Record<StatusType, StatusEffect>> = {};
-  genes: GeneTrait[] = [];
+  // v2.0: Genes are looked up via library, but we store the config to pass params
+  geneConfig: GeneConfig[] = [];
 
   constructor(id: number) { 
       this.id = id; 
       this.speedVar = 0.9 + Math.random() * 0.2; 
       this.waveOffset = Math.random() * 100;
+      this.frameOffset = Math.floor(Math.random() * 60);
       this.stats = {
           hp: 0, maxHp: 0, damage: 0, range: 0, speed: 0, attackSpeed: 0,
           width: 0, height: 0, color: 0, armor: 0,
@@ -104,6 +107,7 @@ class UnitPool {
     unit.waveOffset = Math.random() * 100;
     unit.wanderTimer = 0;
     unit.wanderDir = 1;
+    unit.frameOffset = Math.floor(Math.random() * 60);
 
     let stats: UnitRuntimeStats;
     const config = UNIT_CONFIGS[type];
@@ -132,14 +136,8 @@ class UnitPool {
     unit.stats = stats;
     unit.radius = stats.width / 2;
     
-    // Initialize Genes
-    unit.genes = [];
-    if (config.geneIds) {
-        config.geneIds.forEach(id => {
-            const gene = GeneLibrary.get(id);
-            if (gene) unit.genes.push(gene);
-        });
-    }
+    // Initialize Genes via Config
+    unit.geneConfig = config.genes || [];
 
     if (unit.view) {
       unit.view.visible = true;
@@ -186,6 +184,7 @@ class UnitPool {
     if (!unit.active) return;
     unit.active = false;
     unit.isDead = false;
+    unit.geneConfig = []; // Clear ref
     if (unit.view) unit.view.visible = false;
     this.freeIndices.push(unit.id); // Return index to stack
   }
@@ -383,7 +382,12 @@ export class GameEngine implements IGameEngine {
             this.processCorpse(u, dt);
         } else {
             // GENE HOOK: Tick
-            if (u.genes) u.genes.forEach(g => { if (g.onTick) g.onTick(u, dt, this); });
+            if (u.geneConfig) {
+                for (const cfg of u.geneConfig) {
+                    const gene = GeneLibrary.get(cfg.id);
+                    if (gene && gene.onTick) gene.onTick(u, dt, this, cfg.params || {});
+                }
+            }
             this.processUnit(u, dt);
         }
     }
@@ -533,11 +537,11 @@ export class GameEngine implements IGameEngine {
          let handled = false;
          
          // GENE HOOK: Acquire Target (Priority 1)
-         // Useful for Healers to target allies or Snipers to target distant/high-value targets
-         if (u.genes) {
-             for (const g of u.genes) {
-                 if (g.onAcquireTarget) {
-                     const t = g.onAcquireTarget(u, potentialTargets, this);
+         if (u.geneConfig) {
+             for (const cfg of u.geneConfig) {
+                 const gene = GeneLibrary.get(cfg.id);
+                 if (gene && gene.onAcquireTarget) {
+                     const t = gene.onAcquireTarget(u, potentialTargets, this, cfg.params || {});
                      if (t) { u.target = t; handled = true; break; }
                  }
              }
@@ -563,11 +567,11 @@ export class GameEngine implements IGameEngine {
      let moved = false;
      
      // GENE HOOK: Move
-     // The base vector (Chasing vs Marching) is now handled INSIDE genes like GENE_SWARM_MOVEMENT
-     if (u.genes) {
-         for (const g of u.genes) {
-            if (g.onMove) {
-                g.onMove(u, velocity, dt, this);
+     if (u.geneConfig) {
+         for (const cfg of u.geneConfig) {
+            const gene = GeneLibrary.get(cfg.id);
+            if (gene && gene.onMove) {
+                gene.onMove(u, velocity, dt, this, cfg.params || {});
                 moved = true;
             }
          }
@@ -613,10 +617,11 @@ export class GameEngine implements IGameEngine {
   public performAttack(source: IUnit, target: IUnit) {
      let handled = false;
      // GENE HOOK: PreAttack (e.g., suicide bombers, healers, projectiles)
-     if (source.genes) {
-         for (const g of source.genes) {
-             if (g.onPreAttack) {
-                 const result = g.onPreAttack(source, target, this);
+     if (source.geneConfig) {
+         for (const cfg of source.geneConfig) {
+             const gene = GeneLibrary.get(cfg.id);
+             if (gene && gene.onPreAttack) {
+                 const result = gene.onPreAttack(source, target, this, cfg.params || {});
                  if (result === false) { handled = true; break; }
              }
          }
@@ -657,7 +662,12 @@ export class GameEngine implements IGameEngine {
       let rawDamage = source.stats.damage;
       
       // GENE HOOK: OnHit
-      if (source.genes) source.genes.forEach(g => { if (g.onHit) g.onHit(source, target, rawDamage, this); });
+      if (source.geneConfig) {
+          source.geneConfig.forEach(cfg => { 
+             const gene = GeneLibrary.get(cfg.id);
+             if (gene && gene.onHit) gene.onHit(source, target, rawDamage, this, cfg.params || {});
+          });
+      }
 
       // ELEMENTAL REGISTRY
       ReactionRegistry.handle(target, elementType, this, rawDamage);
@@ -682,7 +692,12 @@ export class GameEngine implements IGameEngine {
       u.decayTimer = DECAY_TIME;
       
       // GENE HOOK: OnDeath
-      if (u.genes) u.genes.forEach(g => { if(g.onDeath) g.onDeath(u, this); });
+      if (u.geneConfig) {
+         u.geneConfig.forEach(cfg => { 
+            const gene = GeneLibrary.get(cfg.id);
+            if(gene && gene.onDeath) gene.onDeath(u, this, cfg.params || {}); 
+         });
+      }
 
       if (u.faction === Faction.HUMAN) DataManager.instance.modifyResource('biomass', 10);
       else DataManager.instance.modifyResource('biomass', 5 * 0.5); // Recycle

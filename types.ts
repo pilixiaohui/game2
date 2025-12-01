@@ -49,6 +49,12 @@ export interface StatusEffect {
 
 export type Polarity = 'ATTACK' | 'DEFENSE' | 'FUNCTION' | 'UNIVERSAL';
 
+// v2.0: Parameterized Gene Config
+export interface GeneConfig {
+    id: string;
+    params?: Record<string, any>;
+}
+
 export interface UnitConfig {
     id: UnitType;
     name: string;
@@ -81,7 +87,8 @@ export interface UnitConfig {
         type: ElementType;
         statusPerHit?: number;
     };
-    geneIds?: string[];
+    // Replaced geneIds string[] with structured config
+    genes?: GeneConfig[];
     tags?: string[];
 }
 
@@ -290,21 +297,21 @@ export interface GeneTrait {
     id: string;
     name: string;
     
-    // Lifecycle Hooks
-    onTick?: (self: IUnit, dt: number, engine: IGameEngine) => void;
+    // Lifecycle Hooks - v2.0: Now accepts specific params
+    onTick?: (self: IUnit, dt: number, engine: IGameEngine, params: any) => void;
     
     // Movement Logic
     // Velocity is passed by reference. Genes should modify it.
-    onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine) => void; 
+    onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine, params: any) => void; 
     
     // Targeting Logic (New in v2.0 Fix)
     // Returns a unit to lock onto. If null, engine falls back to default logic.
-    onAcquireTarget?: (self: IUnit, potentialTargets: IUnit[], engine: IGameEngine) => IUnit | null;
+    onAcquireTarget?: (self: IUnit, potentialTargets: IUnit[], engine: IGameEngine, params: any) => IUnit | null;
     
     // Combat Hooks
-    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine) => boolean; // Return false to cancel default attack
-    onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine) => void;
-    onDeath?: (self: IUnit, engine: IGameEngine) => void;
+    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine, params: any) => boolean; // Return false to cancel default attack
+    onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine, params: any) => void;
+    onDeath?: (self: IUnit, engine: IGameEngine, params: any) => void;
 }
 
 export interface IUnit {
@@ -333,9 +340,12 @@ export interface IUnit {
     speedVar: number;
     waveOffset: number;
     
+    // v2.0: Optimization Fields
+    frameOffset: number; // For Time-Slicing logic (0-60)
+    
     // System
     view: any; // PIXI.Graphics
-    genes: GeneTrait[];
+    geneConfig: GeneConfig[]; // The instance config
     
     // State
     state: string;
