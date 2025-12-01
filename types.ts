@@ -87,7 +87,6 @@ export interface UnitConfig {
         type: ElementType;
         statusPerHit?: number;
     };
-    // Replaced geneIds string[] with structured config
     genes?: GeneConfig[];
     tags?: string[];
 }
@@ -297,19 +296,17 @@ export interface GeneTrait {
     id: string;
     name: string;
     
-    // Lifecycle Hooks - v2.0: Now accepts specific params
+    // Lifecycle Hooks
     onTick?: (self: IUnit, dt: number, engine: IGameEngine, params: any) => void;
     
     // Movement Logic
-    // Velocity is passed by reference. Genes should modify it.
     onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine, params: any) => void; 
     
-    // Targeting Logic (New in v2.0 Fix)
-    // Returns a unit to lock onto. If null, engine falls back to default logic.
+    // Targeting Logic
     onAcquireTarget?: (self: IUnit, potentialTargets: IUnit[], engine: IGameEngine, params: any) => IUnit | null;
     
     // Combat Hooks
-    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine, params: any) => boolean; // Return false to cancel default attack
+    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine, params: any) => boolean; 
     onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine, params: any) => void;
     onDeath?: (self: IUnit, engine: IGameEngine, params: any) => void;
 }
@@ -332,7 +329,7 @@ export interface IUnit {
     target: IUnit | null;
     flashTimer: number;
     
-    // Runtime Fields - Promoted to Interface to avoid casting
+    // Runtime Fields
     decayTimer: number;
     wanderTimer: number;
     wanderDir: number;
@@ -340,12 +337,13 @@ export interface IUnit {
     speedVar: number;
     waveOffset: number;
     
-    // v2.0: Optimization Fields
-    frameOffset: number; // For Time-Slicing logic (0-60)
+    // Optimization & Physics Fields (v2.0)
+    frameOffset: number; 
+    steeringForce: { x: number, y: number }; // Sample-and-Hold force for Boids
     
     // System
-    view: any; // PIXI.Graphics
-    geneConfig: GeneConfig[]; // The instance config
+    view: any; 
+    geneConfig: GeneConfig[];
     
     // State
     state: string;

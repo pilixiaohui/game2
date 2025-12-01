@@ -185,18 +185,18 @@ GeneLibrary.register({
     }
 });
 
-// --- CORE MOVEMENT (Optimized v2.0) ---
+// --- SWARM MOVEMENT (Optimized v2.0) ---
 
 GeneLibrary.register({
     id: 'GENE_SWARM_MOVEMENT',
     name: 'Swarm Movement',
     onMove: (self, velocity, dt, engine, params) => {
-        // --- 1. Base Impulse ---
+        // 1. Base Impulse (Targeting)
         let baseDx = 0;
         let baseDy = 0;
 
         if (self.target && !self.target.isDead) {
-            // Chase
+            // Chase logic
             const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
             const dist = Math.sqrt(distSq);
             if (dist > self.stats.range * 0.8) {
@@ -206,7 +206,7 @@ GeneLibrary.register({
                 baseDy = dirY * self.stats.speed * self.speedVar * dt;
             }
         } else {
-            // March
+            // March logic
             const moveDir = self.faction === Faction.ZERG ? 1 : -1;
             if (self.stats.speed > 0) {
                 baseDx = moveDir * self.stats.speed * self.speedVar * dt;
@@ -214,66 +214,75 @@ GeneLibrary.register({
             }
         }
 
-        // --- 2. Boids (Time Sliced) ---
-        // To save CPU, only update neighbors every 3 frames (interleaved by ID)
-        const frame = Math.floor(Date.now() / 16); 
-        const updateBoids = (frame + self.frameOffset) % 3 === 0;
+        // 2. Boids Logic (Time Sliced with Sample & Hold)
+        // We calculate forces every N frames but apply the *cached* force every frame.
+        // This avoids the "Stutter" of zeroing out forces on skipped frames.
         
-        // Cache previous forces in a property if we want true smoothing, 
-        // but for now, we just skip query and use 0 force on skipped frames (simple stutter check)
-        // OR better: we re-use the velocity from last frame? 
-        // For this implementation, we will perform the query but allow params to tune radius.
-        
-        let forceX = 0;
-        let forceY = 0;
+        const frame = Math.floor(Date.now() / 32); 
+        const shouldUpdate = (frame + self.frameOffset) % 3 === 0;
 
-        if (updateBoids) {
+        if (shouldUpdate) {
             const sepRadius = params.separationRadius || 40;
             const sepForce = params.separationForce || 1.5;
-            const cohWeight = params.cohesionWeight || 0.0;
+            const cohWeight = params.cohesionWeight || 0.1;
+            const aliWeight = params.alignmentWeight || 0.1;
             
             const neighbors = engine._sharedQueryBuffer;
-            // Use local query
             const count = engine.spatialHash.query(self.x, self.y, sepRadius, neighbors);
+            
+            let forceX = 0;
+            let forceY = 0;
             
             let centerX = 0;
             let centerY = 0;
+            let avgVelX = 0; // Approximation of alignment via position diffs isn't perfect but sufficient
             let neighborCount = 0;
 
             for (let i = 0; i < count; i++) {
                 const friend = neighbors[i];
                 if (friend === self || friend.faction !== self.faction) continue;
                 
-                const distSq = (self.x - friend.x)**2 + (self.y - friend.y)**2;
+                const dx = self.x - friend.x;
+                const dy = self.y - friend.y;
+                const distSq = dx*dx + dy*dy;
                 
-                // Separation
-                if (distSq < sepRadius * sepRadius) {
-                    const factor = sepForce * dt; 
-                    // Simple linear push
-                    forceX += (self.x - friend.x) * factor;
-                    forceY += (self.y - friend.y) * factor;
+                // Separation: Repel from close neighbors
+                if (distSq < sepRadius * sepRadius && distSq > 0.001) {
+                    const dist = Math.sqrt(distSq);
+                    // Stronger repel when closer
+                    const factor = (sepRadius - dist) / sepRadius; 
+                    forceX += (dx / dist) * factor * sepForce;
+                    forceY += (dy / dist) * factor * sepForce;
                 }
 
-                // Cohesion Data Gathering
-                if (cohWeight > 0) {
-                    centerX += friend.x;
-                    centerY += friend.y;
-                    neighborCount++;
-                }
+                // Gather data for Cohesion/Alignment
+                centerX += friend.x;
+                centerY += friend.y;
+                neighborCount++;
             }
 
-            // Apply Cohesion (Steer towards center of neighbors)
-            if (neighborCount > 0 && cohWeight > 0) {
+            if (neighborCount > 0) {
+                // Cohesion: Steer towards center of local flock
                 centerX /= neighborCount;
                 centerY /= neighborCount;
-                forceX += (centerX - self.x) * cohWeight * dt;
-                forceY += (centerY - self.y) * cohWeight * dt;
+                forceX += (centerX - self.x) * cohWeight;
+                forceY += (centerY - self.y) * cohWeight;
+                
+                // Alignment: (Simulated) Steer towards general direction of flock flow
+                // Since we don't strictly sync velocity in SpatialHash, we assume right-flow for Zerg
+                if (self.faction === Faction.ZERG) {
+                     forceX += aliWeight * 2.0; 
+                }
             }
+            
+            // Cache the result
+            self.steeringForce.x = forceX;
+            self.steeringForce.y = forceY;
         }
-        
-        // Sum up logic
-        velocity.x += baseDx + forceX;
-        velocity.y += baseDy + forceY;
+
+        // Apply cached steering forces
+        velocity.x += baseDx + (self.steeringForce.x * dt);
+        velocity.y += baseDy + (self.steeringForce.y * dt);
     }
 });
 

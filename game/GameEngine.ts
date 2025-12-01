@@ -37,6 +37,7 @@ export class Unit implements IUnit {
   speedVar: number = 1.0;   
   waveOffset: number = 0;
   frameOffset: number = 0;
+  steeringForce: { x: number, y: number } = { x: 0, y: 0 };
   
   // Visuals
   view: Graphics | null = null;
@@ -44,7 +45,6 @@ export class Unit implements IUnit {
   
   // --- COMPONENTS ---
   statuses: Partial<Record<StatusType, StatusEffect>> = {};
-  // v2.0: Genes are looked up via library, but we store the config to pass params
   geneConfig: GeneConfig[] = [];
 
   constructor(id: number) { 
@@ -108,6 +108,8 @@ class UnitPool {
     unit.wanderTimer = 0;
     unit.wanderDir = 1;
     unit.frameOffset = Math.floor(Math.random() * 60);
+    unit.steeringForce.x = 0;
+    unit.steeringForce.y = 0;
 
     let stats: UnitRuntimeStats;
     const config = UNIT_CONFIGS[type];
