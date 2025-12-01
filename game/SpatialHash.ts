@@ -16,8 +16,14 @@ export class SpatialHash {
         return `${cx},${cy}`;
     }
 
+    /**
+     * Optimized clear: Reuses arrays by setting length to 0
+     * Reduces GC pressure significantly
+     */
     public clear() {
-        this.grid.clear();
+        for (const cell of this.grid.values()) {
+            cell.length = 0;
+        }
     }
 
     public insert(unit: IUnit) {

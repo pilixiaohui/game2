@@ -1,5 +1,5 @@
 
-import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType } from '../types';
+import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType, Faction } from '../types';
 import { ELEMENT_COLORS, STATUS_CONFIG, UNIT_CONFIGS } from '../constants';
 
 // --- STATUS REGISTRY (v2.0) ---
@@ -203,13 +203,33 @@ GeneLibrary.register({
 GeneLibrary.register({
     id: 'GENE_SWARM_MOVEMENT',
     name: 'Swarm Movement',
-    onMove: (self, velocity, engine) => {
-        // 1. Basic Forward
-        velocity.x *= 1.0;
+    onMove: (self, velocity, dt, engine) => {
+        // velocity input is effectively {0,0} from engine reset
+        // 1. Calculate Base Impulse (Chase or March)
+        let baseDx = 0;
+        let baseDy = 0;
 
-        // 2. Separation (Boids)
-        // Note: We use a small local buffer if we wanted to be perfectly safe recursion-wise,
-        // but since onMove isn't recursive, we use the shared one.
+        if (self.target && !self.target.isDead) {
+            // Chase Target
+            const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
+            const dist = Math.sqrt(distSq);
+            // Don't move if within range
+            if (dist > self.stats.range * 0.8) {
+                const dirX = (self.target.x - self.x) / dist;
+                const dirY = (self.target.y - self.y) / dist;
+                baseDx = dirX * self.stats.speed * self.speedVar * dt;
+                baseDy = dirY * self.stats.speed * self.speedVar * dt;
+            }
+        } else {
+            // March Forward (no target)
+            const moveDir = self.faction === Faction.ZERG ? 1 : -1;
+            baseDx = moveDir * self.stats.speed * self.speedVar * dt;
+            // Bobbing motion for "floating" units
+            baseDy = Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
+        }
+
+        // 2. Apply Separation (Boids)
+        // Use shared buffer from engine to avoid allocation
         const neighbors = engine._sharedQueryBuffer;
         const count = engine.spatialHash.query(self.x, self.y, 40, neighbors);
         
@@ -218,28 +238,31 @@ GeneLibrary.register({
         
         for (let i = 0; i < count; i++) {
             const friend = neighbors[i];
+            // Only separate from same faction
             if (friend === self || friend.faction !== self.faction) continue;
             
             const distSq = (self.x - friend.x)**2 + (self.y - friend.y)**2;
             const minDist = self.radius + friend.radius;
             
+            // If overlapping
             if (distSq < minDist * minDist) {
                 // Linear repulsion
-                const factor = 0.1; 
+                const factor = 1.5 * dt; // Strength
                 forceX += (self.x - friend.x) * factor;
                 forceY += (self.y - friend.y) * factor;
             }
         }
         
-        velocity.x += forceX;
-        velocity.y += forceY;
+        // Sum up logic
+        velocity.x += baseDx + forceX;
+        velocity.y += baseDy + forceY;
     }
 });
 
 GeneLibrary.register({
     id: 'GENE_FAST_MOVEMENT',
     name: 'Fast',
-    onMove: (self, velocity, engine) => {
+    onMove: (self, velocity, dt, engine) => {
         velocity.x *= 1.2;
     }
 });

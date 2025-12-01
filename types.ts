@@ -310,7 +310,14 @@ export interface GeneTrait {
     
     // Lifecycle Hooks
     onTick?: (self: IUnit, dt: number, engine: IGameEngine) => void;
-    onMove?: (self: IUnit, velocity: {x:number, y:number}, engine: IGameEngine) => void; // Modifies velocity in place
+    
+    // Movement Logic: Modifies velocity in place. Includes dt to allow calculating displacement.
+    onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine) => void; 
+    
+    // Targeting Logic: Returns a valid target or null. If null, engine may fall back to default.
+    onAcquireTarget?: (self: IUnit, potentialTargets: IUnit[], engine: IGameEngine) => IUnit | null;
+    
+    // Combat Hooks
     onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine) => boolean; // Return false to cancel default melee
     onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine) => void;
     onDeath?: (self: IUnit, engine: IGameEngine) => void;
@@ -334,13 +341,18 @@ export interface IUnit {
     target: IUnit | null;
     flashTimer: number;
     
+    // Runtime Fields (Added for v2.0 Type Safety)
+    decayTimer: number;
+    wanderTimer: number;
+    wanderDir: number;
+    engagedCount: number;
+    speedVar: number;
+    waveOffset: number;
+    
     // System
     view: any; // PIXI.Graphics
     genes: GeneTrait[];
     
     // State
     state: string;
-    engagedCount: number;
-    speedVar: number;
-    waveOffset: number;
 }

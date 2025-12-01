@@ -28,12 +28,12 @@ export class Unit implements IUnit {
   // AI State
   state: 'MOVE' | 'ATTACK' | 'IDLE' | 'DEAD' | 'WANDER' = 'IDLE';
   isDead: boolean = false;
-  decayTimer: number = 0;
-  target: Unit | null = null;
-  wanderTimer: number = 0;
-  wanderDir: number = 0;
+  target: IUnit | null = null;
   
   // --- Swarm AI Properties ---
+  decayTimer: number = 0;
+  wanderTimer: number = 0;
+  wanderDir: number = 0;
   engagedCount: number = 0; 
   speedVar: number = 1.0;   
   waveOffset: number = 0;   
@@ -99,9 +99,12 @@ class UnitPool {
     unit.flashTimer = 0;
     
     // Reset AI props
+    unit.decayTimer = 0;
     unit.engagedCount = 0;
     unit.speedVar = 0.85 + Math.random() * 0.3; 
     unit.waveOffset = Math.random() * 100;
+    unit.wanderTimer = 0;
+    unit.wanderDir = 1;
 
     let stats: UnitRuntimeStats;
     const config = UNIT_CONFIGS[type];
@@ -497,12 +500,12 @@ export class GameEngine implements IGameEngine {
       });
   }
 
-  private processUnit(u: Unit, dt: number) {
+  private processUnit(u: IUnit, dt: number) {
      this.updateStatusEffects(u, dt);
      if (u.flashTimer > 0) u.flashTimer -= dt;
      this.updateUnitVisuals(u);
 
-     // Stockpile Wander
+     // Stockpile Wander (Special Case, still controlled by Engine for now as it's non-combat)
      if (this.isStockpileMode && u.faction === Faction.ZERG) {
          u.state = 'WANDER';
          u.wanderTimer -= dt;
@@ -515,50 +518,73 @@ export class GameEngine implements IGameEngine {
 
      if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
 
-     // --- Targeting via Spatial Hash ---
+     // --- Targeting System (Refactored) ---
      const AGGRO_RANGE = 500;
-     if (!u.target || u.target.isDead || !u.target.active || ((u.target.x-u.x)**2 > AGGRO_RANGE**2)) {
+     
+     // 1. Validate existing target
+     if (u.target && (u.target.isDead || !u.target.active || ((u.target.x-u.x)**2 > AGGRO_RANGE**2))) {
          u.target = null;
-         
+     }
+
+     // 2. Acquire new target
+     if (!u.target) {
          const potentialTargets = this._sharedQueryBuffer;
          const count = this.spatialHash.query(u.x, u.y, AGGRO_RANGE, potentialTargets);
          
-         let bestDist = Infinity;
-         for (let i = 0; i < count; i++) {
-             const enemy = potentialTargets[i];
-             if (enemy.faction === u.faction) continue;
-             const dist = (enemy.x - u.x)**2;
-             if (dist < bestDist) { bestDist = dist; u.target = enemy as Unit; }
+         // GENE HOOK: Targeting (Priority 1)
+         let handled = false;
+         for (const g of u.genes) {
+             if (g.onAcquireTarget) {
+                 // Slicing might be slow, passing the buffer and letting gene handle count would be faster in future optimization,
+                 // but for now relying on buffer validity up to count.
+                 // NOTE: Since onAcquireTarget takes IUnit[], we pass the full buffer but the logic inside must respect count if we exposed it.
+                 // However, potentialTargets is just a plain array. 
+                 // Since we cleared it and pushed, potentialTargets.length IS count.
+                 const t = g.onAcquireTarget(u, potentialTargets, this);
+                 if (t) {
+                     u.target = t;
+                     handled = true;
+                     break;
+                 }
+             }
+         }
+
+         // Engine Default: Nearest Enemy (Priority 2)
+         if (!handled) {
+            let bestDist = Infinity;
+            let bestTarget: IUnit | null = null;
+            for (let i = 0; i < potentialTargets.length; i++) {
+                 const entity = potentialTargets[i];
+                 if (entity.faction === u.faction || entity.isDead) continue;
+                 const dist = (entity.x - u.x)**2 + (entity.y - u.y)**2;
+                 if (dist < bestDist) { bestDist = dist; bestTarget = entity; }
+            }
+            u.target = bestTarget;
          }
      }
 
-     // --- Movement ---
-     let dx = 0;
-     let dy = 0;
-     let isMoving = false;
-
-     if (u.target && !u.target.isDead) {
-         const dist = Math.sqrt((u.target.x - u.x)**2 + (u.target.y - u.y)**2);
-         if (dist > u.stats.range * 0.8) {
-             const dirX = (u.target.x - u.x) / dist;
-             const dirY = (u.target.y - u.y) / dist;
-             dx += dirX * u.stats.speed * u.speedVar * dt;
-             dy += dirY * u.stats.speed * u.speedVar * dt;
-             isMoving = true;
+     // --- Movement System (Refactored) ---
+     const velocity = { x: 0, y: 0 };
+     let moved = false;
+     
+     // GENE HOOK: Move
+     // The base vector and separation logic are now inside GENE_SWARM_MOVEMENT or GENE_FAST_MOVEMENT
+     if (u.genes) {
+         for (const g of u.genes) {
+            if (g.onMove) {
+                g.onMove(u, velocity, dt, this);
+                moved = true;
+            }
          }
-     } else {
-         const moveDir = u.faction === Faction.ZERG ? 1 : -1;
-         dx += moveDir * u.stats.speed * u.speedVar * dt;
-         dy += Math.sin(Date.now()/1000 + u.waveOffset) * 20 * dt;
-         isMoving = true;
+     }
+     
+     // Note: If no gene handles movement, unit stays still (unlike previous hardcoded forward march)
+     if (moved) {
+        u.x += velocity.x;
+        u.y += velocity.y;
      }
 
-     // GENE HOOK: Move (Compositional Logic replaces Hardcoded Boids)
-     const velocity = { x: dx, y: dy };
-     if (u.genes) u.genes.forEach(g => { if(g.onMove) g.onMove(u, velocity, this); });
-     u.x += velocity.x;
-     u.y += velocity.y;
-
+     // View Sync
      if (u.view) {
          u.view.position.x = u.x;
          u.view.y = u.y;
@@ -566,6 +592,7 @@ export class GameEngine implements IGameEngine {
          if (Math.abs(velocity.x) > 0.1) u.view.scale.x = velocity.x < 0 ? -1 : 1;
      }
 
+     // --- Combat System ---
      u.attackCooldown -= dt;
      if (u.target && !u.target.isDead) {
          const dist = Math.sqrt((u.target.x - u.x)**2 + (u.target.y - u.y)**2);
@@ -573,13 +600,13 @@ export class GameEngine implements IGameEngine {
              u.state = 'ATTACK'; 
              if (u.attackCooldown <= 0) {
                  u.attackCooldown = u.stats.attackSpeed;
-                 this.performAttack(u, u.target as Unit);
+                 this.performAttack(u, u.target);
              }
          }
      }
   }
 
-  public updateUnitVisuals(u: Unit) {
+  public updateUnitVisuals(u: IUnit) {
       if (!u.view) return;
       if (u.flashTimer > 0) { u.view.tint = 0xffffaa; return; }
       let tint = 0xffffff;
@@ -589,7 +616,7 @@ export class GameEngine implements IGameEngine {
       u.view.tint = tint;
   }
 
-  public performAttack(source: Unit, target: Unit) {
+  public performAttack(source: IUnit, target: IUnit) {
      let handled = false;
      // GENE HOOK: PreAttack
      if (source.genes) {
@@ -607,7 +634,7 @@ export class GameEngine implements IGameEngine {
      }
   }
 
-  public updateStatusEffects(unit: Unit, dt: number) {
+  public updateStatusEffects(unit: IUnit, dt: number) {
       if (unit.isDead) return;
       for (const key in unit.statuses) {
           const type = key as StatusType;
@@ -658,9 +685,8 @@ export class GameEngine implements IGameEngine {
   public killUnit(u: IUnit) {
       if (u.isDead) return;
       u.isDead = true; u.state = 'DEAD'; 
-      // @ts-ignore - casting unit back to class for property access not on interface if needed, but IUnit has decayTimer? No, Unit class has it.
-      // Ideally IUnit should have decayTimer or we cast. For now, simple cast or add to interface.
-      (u as Unit).decayTimer = DECAY_TIME;
+      // Type safety: IUnit now has decayTimer
+      u.decayTimer = DECAY_TIME;
       
       // GENE HOOK: OnDeath
       if (u.genes) u.genes.forEach(g => { if(g.onDeath) g.onDeath(u, this); });
@@ -708,8 +734,8 @@ export class GameEngine implements IGameEngine {
       const g = this.getGraphics(); g.beginFill(color, 0.5); g.drawCircle(0, 0, 10); g.endFill(); g.position.set(x, y); 
       this.activeParticles.push({ view: g, type: 'GRAPHICS', life: 0, maxLife: 20, update: (p: any, dt: number) => { p.life++; p.view.width += 8; p.view.height += 8; p.view.alpha -= 0.05; return p.view.alpha > 0; } });
   }
-  private processCorpse(u: Unit, dt: number) {
-      u.decayTimer -= dt; if (u.view) { u.view.y += 10 * dt; u.view.alpha = Math.max(0, u.decayTimer / DECAY_TIME); } if (u.decayTimer <= 0) this.unitPool!.recycle(u);
+  private processCorpse(u: IUnit, dt: number) {
+      u.decayTimer -= dt; if (u.view) { u.view.y += 10 * dt; u.view.alpha = Math.max(0, u.decayTimer / DECAY_TIME); } if (u.decayTimer <= 0) this.unitPool!.recycle(u as Unit);
   }
 
   public getSnapshot(): GameStateSnapshot {
