@@ -1,4 +1,5 @@
 
+
 import { GameSaveData, UnitType, UnitRuntimeStats, Resources, GameModifiers, BioPluginConfig, PluginInstance, ElementType } from '../types';
 import { INITIAL_GAME_STATE, UNIT_CONFIGS, UNIT_UPGRADE_COST_BASE, RECYCLE_REFUND_RATE, METABOLISM_FACILITIES, MAX_RESOURCES_BASE, BIO_PLUGINS, CAP_UPGRADE_BASE, EFFICIENCY_UPGRADE_BASE, QUEEN_UPGRADE_BASE, INITIAL_LARVA_CAP, CLICK_CONFIG } from '../constants';
 
@@ -31,14 +32,11 @@ export class DataManager {
     public events: SimpleEventEmitter;
     private autoSaveInterval: any;
     
-    // Game Logic Loop properties
     private loopInterval: any;
     private lastTickTime: number = Date.now();
     
-    // Runtime properties
     public rates: Resources = { biomass: 0, enzymes: 0, larva: 0, dna: 0, mutagen: 0 };
     
-    // Persistent Modifiers (Cards/Artifacts) - stored here so they don't reset on tab switch
     public modifiers: GameModifiers = {
         damageMultiplier: 1.0,
         maxHpMultiplier: 1.0,
@@ -53,9 +51,8 @@ export class DataManager {
         this.loadGame();
         this.autoSaveInterval = setInterval(() => this.saveGame(), 30000);
         
-        // Start independent game loop to fix resource stopping when switching tabs
         this.lastTickTime = Date.now();
-        this.loopInterval = setInterval(() => this.gameLoop(), 100); // 10 ticks per second
+        this.loopInterval = setInterval(() => this.gameLoop(), 100); 
     }
 
     public static get instance(): DataManager {
@@ -69,11 +66,7 @@ export class DataManager {
         const now = Date.now();
         const dt = (now - this.lastTickTime) / 1000;
         this.lastTickTime = now;
-        
-        // Safety cap for dt (max 1s sim per tick) to prevent huge jumps from background throttling
         const safeDt = Math.min(dt, 1.0);
-        
-        // Apply multipliers from cards/modifiers
         this.updateTick(safeDt * this.modifiers.resourceRateMultiplier);
     }
 
@@ -83,7 +76,7 @@ export class DataManager {
         try {
             localStorage.setItem('HIVE_SAVE_DATA', json);
         } catch (e) {
-            console.warn("Save failed - Storage might be disabled", e);
+            console.warn("Save failed", e);
         }
     }
 
@@ -93,8 +86,6 @@ export class DataManager {
             if (json) {
                 const loaded = JSON.parse(json);
                 this.state = { ...INITIAL_GAME_STATE, ...loaded };
-                
-                // MIGRATION Logic
                 if (!this.state.hive.metabolism.crackerHeat) {
                     this.state.hive.metabolism = JSON.parse(JSON.stringify(INITIAL_GAME_STATE.hive.metabolism));
                 }
@@ -104,9 +95,7 @@ export class DataManager {
                     this.state.hive.production.larvaCapBase = INITIAL_LARVA_CAP;
                     this.state.resources.larva = INITIAL_LARVA_CAP;
                 }
-                if (this.state.player.totalKills === undefined) {
-                    this.state.player.totalKills = 0;
-                }
+                if (this.state.player.totalKills === undefined) this.state.player.totalKills = 0;
                 Object.values(UnitType).forEach(uType => {
                     const u = uType as UnitType;
                     if (!this.state.hive.unlockedUnits[u]) {
@@ -119,7 +108,6 @@ export class DataManager {
                 this.calculateOfflineProgress();
             }
         } catch (e) {
-            console.warn("Load failed - resetting to default", e);
             this.state = JSON.parse(JSON.stringify(INITIAL_GAME_STATE));
         }
     }
@@ -134,23 +122,16 @@ export class DataManager {
     }
 
     public updateTick(dt: number) {
-        this.updateMetabolism(dt); // Sets rates.biomass, rates.enzymes, rates.dna
-        this.updateQueen(dt);      // Update Queen Logic (Produces Larva)
-        
-        // Calculate Base Larva Rate (Income)
+        this.updateMetabolism(dt); 
+        this.updateQueen(dt);      
         const queenStats = this.getQueenStats();
         const queenCount = this.state.hive.unitStockpile[UnitType.QUEEN] || 0;
-        this.rates.larva = (queenCount > 0) 
-            ? (queenCount * queenStats.amount) / queenStats.interval 
-            : 0;
-
-        // Update Hatchery: Consumes resources AND updates Net Rates
+        this.rates.larva = (queenCount > 0) ? (queenCount * queenStats.amount) / queenStats.interval : 0;
         this.updateHatchery(dt);
     }
 
     public modifyResource(type: keyof Resources, amount: number) {
         this.state.resources[type] += amount;
-        
         if (type === 'larva') {
             const max = this.state.hive.production.larvaCapBase;
             if (this.state.resources.larva > max) this.state.resources.larva = max;
@@ -160,7 +141,6 @@ export class DataManager {
                 this.state.resources[type] = cap;
             }
         }
-        
         if (this.state.resources[type] < 0) this.state.resources[type] = 0;
         this.events.emit('RESOURCE_CHANGED', { type, value: this.state.resources[type] });
     }
@@ -172,9 +152,7 @@ export class DataManager {
     
     public getMaxPopulationCap(): number {
         let total = 0;
-        Object.values(this.state.hive.unlockedUnits).forEach(u => {
-            total += u.cap || 0;
-        });
+        Object.values(this.state.hive.unlockedUnits).forEach(u => { total += u.cap || 0; });
         const supplyBonus = (this.state.hive.metabolism.supplyCount || 0) * METABOLISM_FACILITIES.SUPPLY.CAP_PER_LEVEL;
         return total + supplyBonus;
     }
@@ -185,58 +163,28 @@ export class DataManager {
         const meta: any = this.state.hive.metabolism;
         const res = this.state.resources;
         const conf = METABOLISM_FACILITIES;
-
-        // Reset rates for this tick
         let bioRate = 0;
         let enzRate = 0;
         let dnaRate = 0;
 
-        // ================= MATTER (BIOMASS) =================
-        
-        // T1: Villi (Cluster Effect: +25% per 100)
         const clusterMult = Math.pow(1.25, Math.floor(meta.villiCount / 100));
         const villiBase = conf.VILLI.BASE_RATE + (meta.taprootCount * conf.TAPROOT.BONUS_TO_VILLI);
-        const villiProd = meta.villiCount * villiBase * clusterMult;
-        bioRate += villiProd;
+        bioRate += meta.villiCount * villiBase * clusterMult;
+        bioRate += meta.geyserCount * conf.GEYSER.BASE_RATE;
+        bioRate += meta.breakerCount * conf.BREAKER.BASE_RATE;
 
-        // T2: Geyser
-        const geyserProd = meta.geyserCount * conf.GEYSER.BASE_RATE;
-        bioRate += geyserProd;
+        if (res.biomass > 5000) bioRate -= res.biomass * meta.breakerCount * conf.BREAKER.LOSS_RATE;
 
-        // T2/T4: Breaker (Overload & Loss)
-        const breakerProd = meta.breakerCount * conf.BREAKER.BASE_RATE;
-        bioRate += breakerProd;
-
-        let breakerLoss = 0;
-        if (res.biomass > 5000) {
-            breakerLoss = res.biomass * meta.breakerCount * conf.BREAKER.LOSS_RATE;
-            bioRate -= breakerLoss;
-        }
-
-        // T3: Necro Siphon (Warfare Harvest) - Scales with kills
         const kills = (this.state.player as any).totalKills || 0; 
-        const necroProd = (meta.necroSiphonCount || 0) * (conf.NECRO_SIPHON.BASE_RATE + kills * conf.NECRO_SIPHON.KILL_SCALAR);
-        bioRate += necroProd;
+        bioRate += (meta.necroSiphonCount || 0) * (conf.NECRO_SIPHON.BASE_RATE + kills * conf.NECRO_SIPHON.KILL_SCALAR);
+        bioRate += (meta.redTideCount || 0) * conf.RED_TIDE.BASE_RATE * (1 + (meta.villiCount / 50));
 
-        // T4: Red Tide (Synergy) - Uses Villi count as multiplier
-        const redTideMult = 1 + (meta.villiCount / 50); 
-        const redTideProd = (meta.redTideCount || 0) * conf.RED_TIDE.BASE_RATE * redTideMult;
-        bioRate += redTideProd;
-
-        // T5: Gaia Digester (Damped Compounding) - End Game
-        let gaiaProd = 0;
         if (meta.gaiaDigesterCount > 0) {
-            gaiaProd = meta.gaiaDigesterCount * conf.GAIA_DIGESTER.COEFF * Math.pow(Math.max(1, res.biomass), conf.GAIA_DIGESTER.POW_FACTOR);
-            bioRate += gaiaProd;
+            bioRate += meta.gaiaDigesterCount * conf.GAIA_DIGESTER.COEFF * Math.pow(Math.max(1, res.biomass), conf.GAIA_DIGESTER.POW_FACTOR);
         }
 
-        // Apply Biomass Income
         this.modifyResource('biomass', bioRate * dt);
 
-
-        // ================= ENERGY (ENZYMES) =================
-
-        // T1: Sac & Pump
         if (meta.fermentingSacCount > 0) {
             let cost = conf.SAC.INPUT - (meta.refluxPumpCount * conf.PUMP.COST_REDUCTION);
             cost = Math.max(conf.PUMP.MIN_COST, cost);
@@ -247,23 +195,18 @@ export class DataManager {
                 bioRate -= consumptionRate;
                 const productionRate = (consumptionRate / cost) * conf.SAC.OUTPUT;
                 enzRate += productionRate;
-
                 this.modifyResource('biomass', -consumed);
                 this.modifyResource('enzymes', productionRate * dt);
             }
         }
 
-        // T2: Cracker (Heat)
         if (meta.thermalCrackerCount > 0) {
             if (!meta.crackerOverheated) {
                  const inputNeeded = meta.thermalCrackerCount * conf.CRACKER.INPUT * dt;
                  if (res.biomass >= inputNeeded) {
-                     const consumptionRate = inputNeeded / dt;
-                     bioRate -= consumptionRate;
-                     
+                     bioRate -= inputNeeded / dt;
                      const productionRate = meta.thermalCrackerCount * conf.CRACKER.OUTPUT;
                      enzRate += productionRate;
-
                      this.modifyResource('biomass', -inputNeeded);
                      this.modifyResource('enzymes', productionRate * dt);
                      meta.crackerHeat += conf.CRACKER.HEAT_GEN * dt;
@@ -277,65 +220,47 @@ export class DataManager {
             }
         }
         
-        // T2: Boiler (Larva -> Enz)
         if (meta.fleshBoilerCount > 0) {
             const larvaNeeded = meta.fleshBoilerCount * conf.BOILER.INPUT_LARVA * dt;
             if (res.larva >= larvaNeeded) {
-                // Not modifying this.rates.larva here as it's separate from production
                 const productionRate = meta.fleshBoilerCount * conf.BOILER.OUTPUT_ENZ;
                 enzRate += productionRate;
-
                 this.modifyResource('larva', -larvaNeeded);
                 this.modifyResource('enzymes', productionRate * dt);
             }
         }
 
-        // T3: Blood Fusion (Units -> Enz)
         if ((meta.bloodFusionCount || 0) > 0) {
             const meleeStock = this.state.hive.unitStockpile['MELEE'] || 0;
-            const eatRate = 1.0; 
-            const eatChance = (meta.bloodFusionCount || 0) * eatRate * dt;
-            
-            // Probabilistic consumption
+            const eatChance = (meta.bloodFusionCount || 0) * 1.0 * dt;
             if (meleeStock >= 1 && Math.random() < eatChance) {
                 this.state.hive.unitStockpile['MELEE']--;
-                // Pulse event, not continuous rate usually, but can average it for display?
-                // Keeping it as pulse for now, rate display might ignore this or jump.
                 this.modifyResource('enzymes', conf.BLOOD_FUSION.OUTPUT_ENZ);
                 this.events.emit('STOCKPILE_CHANGED', this.state.hive.unitStockpile);
             }
         }
 
-        // T4: Resonator (Pop -> Enz)
         if ((meta.synapticResonatorCount || 0) > 0) {
             const totalPop = this.getTotalStockpile();
             const resGen = (meta.synapticResonatorCount || 0) * Math.sqrt(totalPop) * conf.RESONATOR.POP_SCALAR * dt;
-            const resRate = resGen / dt;
-            enzRate += resRate;
+            enzRate += resGen / dt;
             this.modifyResource('enzymes', resGen);
         }
 
-        // T5: Entropy Vent (Burn Bio -> Enz)
         if ((meta.entropyVentCount || 0) > 0) {
             const burnAmount = res.biomass * conf.ENTROPY_VENT.BURN_RATE * dt;
             if (burnAmount > 0) {
-                const burnRate = burnAmount / dt;
-                bioRate -= burnRate;
-                const gainRate = burnRate * conf.ENTROPY_VENT.CONVERT_RATIO;
+                bioRate -= burnAmount / dt;
+                const gainRate = (burnAmount / dt) * conf.ENTROPY_VENT.CONVERT_RATIO;
                 enzRate += gainRate;
-
                 this.modifyResource('biomass', -burnAmount);
                 this.modifyResource('enzymes', gainRate * dt);
             }
         }
 
-        // ================= DATA (DNA) =================
-        
-        // T1: Spire
         if (meta.thoughtSpireCount > 0) {
              const spireRate = meta.thoughtSpireCount * conf.SPIRE.BASE_RATE;
              dnaRate += spireRate;
-
              meta.spireAccumulator += spireRate * dt;
              if (meta.spireAccumulator >= 1) {
                  const drop = Math.floor(meta.spireAccumulator);
@@ -344,7 +269,6 @@ export class DataManager {
              }
         }
         
-        // T2: Hive Mind
         if (meta.hiveMindCount > 0) {
             const totalPop = this.getTotalStockpile();
             const hiveGen = meta.hiveMindCount * Math.sqrt(Math.max(1, totalPop)) * conf.HIVE_MIND.SCALAR * dt;
@@ -352,7 +276,6 @@ export class DataManager {
             this.modifyResource('dna', hiveGen);
         }
 
-        // T3: Combat Cortex (Melee Stockpile -> DNA)
         if ((meta.combatCortexCount || 0) > 0) {
              const melee = this.state.hive.unitStockpile['MELEE'] || 0;
              const cortexGen = (meta.combatCortexCount || 0) * (melee * 0.1) * conf.COMBAT_CORTEX.BASE_RATE * dt;
@@ -360,17 +283,14 @@ export class DataManager {
              this.modifyResource('dna', cortexGen);
         }
 
-        // Recorder
         if (meta.akashicRecorderCount > 0 && Math.random() < conf.RECORDER.CHANCE * dt) {
              const bonus = Math.floor(res.dna * conf.RECORDER.PERCENT);
              if (bonus > 0) this.modifyResource('dna', bonus);
         }
 
-        // Save Calculated Rates
         this.rates.biomass = bioRate;
         this.rates.enzymes = enzRate;
         this.rates.dna = dnaRate;
-        // Larva rate is set in updateTick
     }
     
     private updateQueen(dt: number) {
@@ -406,25 +326,18 @@ export class DataManager {
             const larvaCost = config.baseCost.larva;
             const timeCost = config.baseCost.time * discount;
 
-            // Calculate Demand Rate (for UI display)
             if (timeCost > 0) {
                 totalBioDrain += bioCost / timeCost;
                 totalDnaDrain += dnaCost / timeCost;
                 totalLarvaDrain += larvaCost / timeCost;
             }
 
-            // Execution Logic
-            if (resources.biomass >= bioCost && 
-                resources.dna >= dnaCost &&
-                resources.larva >= larvaCost) {
-                
+            if (resources.biomass >= bioCost && resources.dna >= dnaCost && resources.larva >= larvaCost) {
                 unit.productionProgress += dt;
-                
                 if (unit.productionProgress >= timeCost) {
                     this.modifyResource('biomass', -bioCost);
                     this.modifyResource('dna', -dnaCost);
                     this.modifyResource('larva', -larvaCost);
-                    
                     stockpile[unit.id] = (stockpile[unit.id] || 0) + 1;
                     unit.productionProgress = 0;
                     this.events.emit('STOCKPILE_CHANGED', stockpile);
@@ -432,14 +345,12 @@ export class DataManager {
             }
         });
 
-        // Update Rates with the Drain
         this.rates.biomass -= totalBioDrain;
         this.rates.dna -= totalDnaDrain;
         this.rates.larva -= totalLarvaDrain;
     }
 
     public getClickValue(): number {
-        // Formula: Base + (BiomassRate * Scaling)
         return CLICK_CONFIG.BASE + (this.rates.biomass * CLICK_CONFIG.SCALING);
     }
 
@@ -460,13 +371,11 @@ export class DataManager {
     public upgradeUnitCap(type: UnitType) {
         const u = this.state.hive.unlockedUnits[type];
         if (!u) return;
-
         const cost = Math.floor(CAP_UPGRADE_BASE * Math.pow(1.5, u.capLevel - 1));
         if (this.state.resources.biomass >= cost) {
             this.modifyResource('biomass', -cost);
             u.capLevel++;
-            const increment = type === UnitType.MELEE ? 20 : type === UnitType.RANGED ? 10 : 1; 
-            u.cap += increment;
+            u.cap += (type === UnitType.MELEE ? 20 : type === UnitType.RANGED ? 10 : 1); 
             this.saveGame();
             this.events.emit('PRODUCTION_CHANGED', {});
         }
@@ -509,7 +418,6 @@ export class DataManager {
         const u = this.state.hive.unlockedUnits[type];
         const config = UNIT_CONFIGS[type];
         const discount = Math.pow(0.95, u.efficiencyLevel - 1);
-        
         return {
             bio: config.baseCost.biomass * discount,
             dna: config.baseCost.dna * discount,
@@ -580,12 +488,10 @@ export class DataManager {
     public upgradeUnit(type: UnitType): boolean {
         const u = this.state.hive.unlockedUnits[type];
         if (!u) return false;
-
         const cost = this.getUpgradeCost(type);
         if (this.state.resources.biomass >= cost) {
             this.modifyResource('biomass', -cost);
             u.level++;
-            
             this.saveGame();
             this.events.emit('UNIT_UPGRADED', type);
             return true;
@@ -630,15 +536,13 @@ export class DataManager {
             return { hp: 0, maxHp: 0, damage: 0, range: 0, speed: 0, attackSpeed: 1, width: 0, height: 0, color: 0, critChance: 0, critDamage: 0, element: 'PHYSICAL', armor: 0 };
         }
         const save = this.state.hive.unlockedUnits[type];
-        
-        // Use persistent modifiers if none provided
         const mods = runtimeModifiers || this.modifiers;
-        
         const lvlMultHp = 1 + (save.level - 1) * config.growthFactors.hp;
         const lvlMultDmg = 1 + (save.level - 1) * config.growthFactors.damage;
         const runMultHp = mods.maxHpMultiplier;
         const runMultDmg = mods.damageMultiplier;
         const mutagenMult = 1 + (this.state.resources.mutagen * 0.1); 
+        
         let pluginMultHp = 0, pluginMultDmg = 0, pluginMultSpeed = 0, pluginMultAttackSpeed = 0, pluginFlatCritChance = 0, pluginMultCritChance = 0, pluginMultCritDmg = 0;
         let element: ElementType = config.elementConfig?.type || 'PHYSICAL'; 
         
@@ -720,9 +624,9 @@ export class DataManager {
     public getMetabolismCost(key: string): { cost: number, resource: string } {
         const meta: any = this.state.hive.metabolism;
         const config: any = METABOLISM_FACILITIES[key as keyof typeof METABOLISM_FACILITIES];
-        
         if (!config) return { cost: 999999, resource: 'biomass' };
-
+        
+        // Simplified count key mapping using a generic approach or specific mapping
         let countKey = '';
         if (key === 'VILLI') countKey = 'villiCount';
         else if (key === 'TAPROOT') countKey = 'taprootCount';
@@ -731,7 +635,6 @@ export class DataManager {
         else if (key === 'NECRO_SIPHON') countKey = 'necroSiphonCount';
         else if (key === 'RED_TIDE') countKey = 'redTideCount';
         else if (key === 'GAIA_DIGESTER') countKey = 'gaiaDigesterCount';
-        
         else if (key === 'SAC') countKey = 'fermentingSacCount';
         else if (key === 'PUMP') countKey = 'refluxPumpCount';
         else if (key === 'CRACKER') countKey = 'thermalCrackerCount';
@@ -739,33 +642,27 @@ export class DataManager {
         else if (key === 'BLOOD_FUSION') countKey = 'bloodFusionCount';
         else if (key === 'RESONATOR') countKey = 'synapticResonatorCount';
         else if (key === 'ENTROPY_VENT') countKey = 'entropyVentCount';
-
         else if (key === 'SPIRE') countKey = 'thoughtSpireCount';
         else if (key === 'HIVE_MIND') countKey = 'hiveMindCount';
         else if (key === 'RECORDER') countKey = 'akashicRecorderCount';
         else if (key === 'COMBAT_CORTEX') countKey = 'combatCortexCount';
         else if (key === 'GENE_ARCHIVE') countKey = 'geneArchiveCount';
         else if (key === 'OMEGA_POINT') countKey = 'omegaPointCount';
-
         else if (key === 'STORAGE') countKey = 'storageCount';
         else if (key === 'SUPPLY') countKey = 'supplyCount';
         
         const count = meta[countKey] || 0;
         const cost = Math.floor(config.BASE_COST * Math.pow(config.GROWTH, count));
-        
         return { cost, resource: config.COST_RESOURCE };
     }
 
     public upgradeMetabolism(key: string) {
         const { cost, resource } = this.getMetabolismCost(key);
         const res = this.state.resources;
-        
         if ((res as any)[resource] >= cost) {
              this.modifyResource(resource as keyof Resources, -cost);
-             
              const meta: any = this.state.hive.metabolism;
              let countKey = '';
-             
              if (key === 'VILLI') countKey = 'villiCount';
              else if (key === 'TAPROOT') countKey = 'taprootCount';
              else if (key === 'GEYSER') countKey = 'geyserCount';
@@ -773,7 +670,6 @@ export class DataManager {
              else if (key === 'NECRO_SIPHON') countKey = 'necroSiphonCount';
              else if (key === 'RED_TIDE') countKey = 'redTideCount';
              else if (key === 'GAIA_DIGESTER') countKey = 'gaiaDigesterCount';
-             
              else if (key === 'SAC') countKey = 'fermentingSacCount';
              else if (key === 'PUMP') countKey = 'refluxPumpCount';
              else if (key === 'CRACKER') countKey = 'thermalCrackerCount';
@@ -781,14 +677,12 @@ export class DataManager {
              else if (key === 'BLOOD_FUSION') countKey = 'bloodFusionCount';
              else if (key === 'RESONATOR') countKey = 'synapticResonatorCount';
              else if (key === 'ENTROPY_VENT') countKey = 'entropyVentCount';
-     
              else if (key === 'SPIRE') countKey = 'thoughtSpireCount';
              else if (key === 'HIVE_MIND') countKey = 'hiveMindCount';
              else if (key === 'RECORDER') countKey = 'akashicRecorderCount';
              else if (key === 'COMBAT_CORTEX') countKey = 'combatCortexCount';
              else if (key === 'GENE_ARCHIVE') countKey = 'geneArchiveCount';
              else if (key === 'OMEGA_POINT') countKey = 'omegaPointCount';
-             
              else if (key === 'STORAGE') countKey = 'storageCount';
              else if (key === 'SUPPLY') countKey = 'supplyCount';
 

@@ -1,4 +1,5 @@
 
+
 import { GeneTrait, IUnit, ElementType, Faction } from '../types';
 import { ELEMENT_COLORS, STATUS_CONFIG, UNIT_CONFIGS } from '../constants';
 
@@ -97,7 +98,7 @@ GeneLibrary.register({
     id: 'GENE_ARTILLERY_ATTACK',
     name: 'Lobbed Shot',
     onPreAttack: (self, target, engine) => {
-        // Simulate lobbed shot (just visual difference for now, reuses projectile logic but maybe slower/arc in future)
+        // Simulate lobbed shot (visual diff for now)
         const color = ELEMENT_COLORS[self.stats.element] || 0xff7777;
         engine.createProjectile(self.x, self.y - 20, target.x, target.y, color); 
         return false;
@@ -170,7 +171,7 @@ GeneLibrary.register({
     id: 'GENE_SWARM_MOVEMENT',
     name: 'Swarm Movement',
     onMove: (self, velocity) => {
-        // Slight randomization
+        // Standard movement
         velocity.x *= 1.0;
     }
 });

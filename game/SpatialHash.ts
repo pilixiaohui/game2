@@ -1,6 +1,6 @@
 
+
 import { IUnit } from '../types';
-import { STAGE_WIDTH, LANE_HEIGHT, LANE_Y } from '../constants';
 
 export class SpatialHash {
     private cellSize: number;
@@ -52,10 +52,5 @@ export class SpatialHash {
             }
         }
         return results;
-    }
-    
-    // Optimized for neighbors: query 3x3 grid around unit
-    public getNeighbors(unit: IUnit, radius: number): IUnit[] {
-         return this.query(unit.x, unit.y, radius);
     }
 }

@@ -11,7 +11,7 @@ export enum UnitType {
   RANGED = 'RANGED',
   QUEEN = 'QUEEN',
   
-  // --- NEW: Elemental Units ---
+  // Elemental Units
   PYROVORE = 'PYROVORE', // Thermal Artillery
   CRYOLISK = 'CRYOLISK', // Cryo Assassin
   OMEGALIS = 'OMEGALIS', // Voltaic Tank
@@ -25,7 +25,7 @@ export enum UnitType {
 }
 
 export enum HiveSection {
-  INVASION = 'INVASION', // New Tab
+  INVASION = 'INVASION',
   EVOLUTION = 'EVOLUTION',
   GRAFTING = 'GRAFTING',
   SEQUENCE = 'SEQUENCE',
@@ -35,7 +35,7 @@ export enum HiveSection {
   PLAGUE = 'PLAGUE',
 }
 
-// --- CORE ELEMENTAL SYSTEM (White Paper v1.3) ---
+// --- CORE ELEMENTAL SYSTEM ---
 
 export type ElementType = 'PHYSICAL' | 'THERMAL' | 'CRYO' | 'VOLTAIC' | 'TOXIN';
 
@@ -49,10 +49,10 @@ export type StatusType =
 
 export interface StatusEffect {
     type: StatusType;
-    stacks: number;      // 0 to 100 (Threshold)
+    stacks: number;      // 0 to 100
     duration: number;    // Time remaining in seconds
-    decayAccumulator?: number; // For stable decay
-    sourceId?: number;   // ID of the unit that applied it
+    decayAccumulator?: number; 
+    sourceId?: number;
 }
 
 export type Polarity = 'ATTACK' | 'DEFENSE' | 'FUNCTION' | 'UNIVERSAL';
@@ -69,7 +69,7 @@ export interface UnitConfig {
         width: number;
         height: number;
         color: number;
-        armor: number; // New: Physical damage reduction
+        armor: number;
     };
     baseCost: {
         biomass: number;
@@ -86,14 +86,14 @@ export interface UnitConfig {
     }[];
     baseLoadCapacity: number;
     
-    // Elemental Configuration
     elementConfig?: {
         type: ElementType;
-        statusPerHit?: number; // How many stacks applied per hit
+        statusPerHit?: number;
     };
     
     // v2.0 Composition System
     geneIds?: string[];
+    tags?: string[];
 }
 
 export interface PluginStatModifier {
@@ -116,7 +116,7 @@ export interface BioPluginConfig {
     statGrowth: number; 
 }
 
-// --- SAVE DATA (Dynamic) ---
+// --- SAVE DATA ---
 
 export interface Resources {
     biomass: number;
@@ -153,10 +153,8 @@ export interface HiveState {
         queenTimer: number;
     };
     metabolism: {
-        // T1
         villiCount: number;
         taprootCount: number;
-        // T2
         geyserCount: number;
         breakerCount: number;
         fermentingSacCount: number;
@@ -165,22 +163,15 @@ export interface HiveState {
         fleshBoilerCount: number;
         crackerHeat: number; 
         crackerOverheated: boolean;
-
-        // T3
         necroSiphonCount?: number;
         bloodFusionCount?: number;
         combatCortexCount?: number;
-
-        // T4
         redTideCount?: number;
         synapticResonatorCount?: number;
         geneArchiveCount?: number;
-
-        // T5
         gaiaDigesterCount?: number;
         entropyVentCount?: number;
         omegaPointCount?: number;
-
         thoughtSpireCount: number;
         hiveMindCount: number;
         akashicRecorderCount: number;
@@ -235,7 +226,7 @@ export interface UnitRuntimeStats {
     width: number;
     height: number;
     color: number;
-    armor: number; // Added
+    armor: number; 
     
     critChance: number;
     critDamage: number;
@@ -269,9 +260,7 @@ export interface GameStateSnapshot {
     stockpileTotal: number;
     populationCap: number; 
     
-    // Detailed Breakdown for HUD
     activeZergCounts: Record<string, number>;
-
     isPaused: boolean;
 }
 
@@ -295,6 +284,18 @@ export interface RegionData {
 
 // --- v2.0 GENE SYSTEM INTERFACES ---
 
+export interface GeneTrait {
+    id: string;
+    name: string;
+    
+    // Lifecycle Hooks
+    onTick?: (self: IUnit, dt: number, engine: any) => void;
+    onMove?: (self: IUnit, velocity: {x:number, y:number}) => void; // Modifies velocity in place
+    onPreAttack?: (self: IUnit, target: IUnit, engine: any) => boolean; // Return false to cancel default melee
+    onHit?: (self: IUnit, target: IUnit, damage: number, engine: any) => void;
+    onDeath?: (self: IUnit, engine: any) => void;
+}
+
 export interface IUnit {
     id: number;
     active: boolean;
@@ -315,16 +316,11 @@ export interface IUnit {
     
     // System
     view: any; // PIXI.Graphics
-}
-
-export interface GeneTrait {
-    id: string;
-    name: string;
+    genes: GeneTrait[];
     
-    // Lifecycle Hooks
-    onTick?: (self: IUnit, dt: number, engine: any) => void;
-    onMove?: (self: IUnit, velocity: {x:number, y:number}) => void; // Modifies velocity in place if needed
-    onPreAttack?: (self: IUnit, target: IUnit, engine: any) => boolean; // Return false to cancel default melee
-    onHit?: (self: IUnit, target: IUnit, damage: number, engine: any) => void;
-    onDeath?: (self: IUnit, engine: any) => void;
+    // State
+    state: string;
+    engagedCount: number;
+    speedVar: number;
+    waveOffset: number;
 }
