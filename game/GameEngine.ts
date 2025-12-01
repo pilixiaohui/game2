@@ -1,10 +1,9 @@
 
-
 import { Application, Container, Graphics, TilingSprite, Text, TextStyle } from 'pixi.js';
-import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect, IUnit, UnitRuntimeStats, GeneTrait } from '../types';
+import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect, IUnit, UnitRuntimeStats, GeneTrait, IGameEngine } from '../types';
 import { UNIT_CONFIGS, LANE_Y, LANE_HEIGHT, DECAY_TIME, MILESTONE_DISTANCE, COLLISION_BUFFER, UNIT_SCREEN_CAPS, ELEMENT_COLORS, INITIAL_REGIONS_CONFIG, STATUS_CONFIG, STAGE_WIDTH, STAGE_TRANSITION_COOLDOWN, OBSTACLES } from '../constants';
 import { DataManager } from './DataManager';
-import { GeneLibrary, ReactionRegistry } from './GeneSystem';
+import { GeneLibrary, ReactionRegistry, StatusRegistry } from './GeneSystem';
 import { SpatialHash } from './SpatialHash';
 
 // --- ECS-lite UNIT CLASS ---
@@ -61,6 +60,7 @@ export class Unit implements IUnit {
 
 class UnitPool {
   private pool: Unit[] = [];
+  private freeIndices: number[] = []; // Stack for O(1) allocation
   public container: Container;
   
   constructor(size: number, container: Container) {
@@ -73,12 +73,15 @@ class UnitPool {
       this.container.addChild(u.view);
       u.view.visible = false;
       this.pool.push(u);
+      this.freeIndices.push(i); // Initialize stack
     }
   }
 
   spawn(faction: Faction, type: UnitType, x: number, modifiers: GameModifiers): Unit | null {
-    const unit = this.pool.find(u => !u.active);
-    if (!unit) return null;
+    if (this.freeIndices.length === 0) return null; // Pool exhausted
+    
+    const idx = this.freeIndices.pop()!;
+    const unit = this.pool[idx];
 
     unit.active = true;
     unit.isDead = false;
@@ -159,7 +162,6 @@ class UnitPool {
       
       // Body
       unit.view.beginFill(color);
-      // Simplified Drawing Logic for brevity, but retains distinction
       if (unit.faction === Faction.ZERG) {
          if (unit.type === UnitType.QUEEN) {
              unit.view.drawRoundedRect(-width/2, -height, width, height, 10);
@@ -179,9 +181,11 @@ class UnitPool {
   }
 
   recycle(unit: Unit) {
+    if (!unit.active) return;
     unit.active = false;
     unit.isDead = false;
     if (unit.view) unit.view.visible = false;
+    this.freeIndices.push(unit.id); // Return index to stack
   }
   getActiveUnits(): Unit[] { return this.pool.filter(u => u.active); }
 }
@@ -194,7 +198,7 @@ interface ActiveParticle {
     update: (p: ActiveParticle, dt: number) => boolean;
 }
 
-export class GameEngine {
+export class GameEngine implements IGameEngine {
   public app: Application | null = null;
   public world: Container;
   
@@ -210,6 +214,8 @@ export class GameEngine {
   
   // v2.0 Spatial Hash
   public spatialHash: SpatialHash;
+  // v2.0 Shared Query Buffer for Zero-Alloc
+  public _sharedQueryBuffer: IUnit[] = [];
 
   get modifiers(): GameModifiers { return DataManager.instance.modifiers; }
 
@@ -513,9 +519,13 @@ export class GameEngine {
      const AGGRO_RANGE = 500;
      if (!u.target || u.target.isDead || !u.target.active || ((u.target.x-u.x)**2 > AGGRO_RANGE**2)) {
          u.target = null;
-         const enemies = this.spatialHash.query(u.x, u.y, AGGRO_RANGE);
+         
+         const potentialTargets = this._sharedQueryBuffer;
+         const count = this.spatialHash.query(u.x, u.y, AGGRO_RANGE, potentialTargets);
+         
          let bestDist = Infinity;
-         for (const enemy of enemies) {
+         for (let i = 0; i < count; i++) {
+             const enemy = potentialTargets[i];
              if (enemy.faction === u.faction) continue;
              const dist = (enemy.x - u.x)**2;
              if (dist < bestDist) { bestDist = dist; u.target = enemy as Unit; }
@@ -543,20 +553,9 @@ export class GameEngine {
          isMoving = true;
      }
 
-     // Repulsion
-     const friends = this.spatialHash.query(u.x, u.y, 40);
-     for (const friend of friends) {
-        if (friend === u || friend.faction !== u.faction) continue;
-        const distSq = (u.x - friend.x)**2 + (u.y - friend.y)**2;
-        if (distSq < (u.radius + friend.radius)**2) {
-            const force = (u.x - friend.x) * 2 * dt;
-            dx += force;
-        }
-     }
-
-     // GENE HOOK: Move
+     // GENE HOOK: Move (Compositional Logic replaces Hardcoded Boids)
      const velocity = { x: dx, y: dy };
-     if (u.genes) u.genes.forEach(g => { if(g.onMove) g.onMove(u, velocity); });
+     if (u.genes) u.genes.forEach(g => { if(g.onMove) g.onMove(u, velocity, this); });
      u.x += velocity.x;
      u.y += velocity.y;
 
@@ -614,14 +613,16 @@ export class GameEngine {
           const type = key as StatusType;
           const effect = unit.statuses[type];
           if (!effect) continue;
+          
           effect.duration -= dt;
           if (effect.duration <= 0) { delete unit.statuses[type]; continue; }
-          if (type === 'BURNING') { this.dealTrueDamage(unit, effect.stacks * 0.5 * dt); } 
-          else if (type === 'POISONED') { this.dealTrueDamage(unit, effect.stacks * 0.3 * dt); }
+          
+          // Delegate to Registry (v2.0)
+          StatusRegistry.onTick(unit, type, dt, this);
       }
   }
 
-  public applyStatus(target: Unit, type: StatusType, stacks: number, duration: number) {
+  public applyStatus(target: IUnit, type: StatusType, stacks: number, duration: number) {
       if (target.isDead) return;
       if (!target.statuses[type]) { target.statuses[type] = { type, stacks: 0, duration: 0 }; }
       const s = target.statuses[type]!;
@@ -629,7 +630,7 @@ export class GameEngine {
       s.duration = Math.max(s.duration, duration);
   }
 
-  public processDamagePipeline(source: Unit, target: Unit) {
+  public processDamagePipeline(source: IUnit, target: IUnit) {
       if (target.isDead) return;
       const elementType = source.stats.element;
       let rawDamage = source.stats.damage;
@@ -650,13 +651,16 @@ export class GameEngine {
       if (target.stats.hp <= 0) this.killUnit(target);
   }
 
-  public dealTrueDamage(target: Unit, amount: number) {
+  public dealTrueDamage(target: IUnit, amount: number) {
       if (target.isDead) return; target.stats.hp -= amount; if (target.stats.hp <= 0) this.killUnit(target);
   }
 
-  public killUnit(u: Unit) {
+  public killUnit(u: IUnit) {
       if (u.isDead) return;
-      u.isDead = true; u.state = 'DEAD'; u.decayTimer = DECAY_TIME;
+      u.isDead = true; u.state = 'DEAD'; 
+      // @ts-ignore - casting unit back to class for property access not on interface if needed, but IUnit has decayTimer? No, Unit class has it.
+      // Ideally IUnit should have decayTimer or we cast. For now, simple cast or add to interface.
+      (u as Unit).decayTimer = DECAY_TIME;
       
       // GENE HOOK: OnDeath
       if (u.genes) u.genes.forEach(g => { if(g.onDeath) g.onDeath(u, this); });

@@ -1,5 +1,4 @@
 
-
 import { IUnit } from '../types';
 
 export class SpatialHash {
@@ -23,14 +22,26 @@ export class SpatialHash {
 
     public insert(unit: IUnit) {
         const key = this.getKey(unit.x, unit.y);
-        if (!this.grid.has(key)) {
-            this.grid.set(key, []);
+        let cell = this.grid.get(key);
+        if (!cell) {
+            cell = [];
+            this.grid.set(key, cell);
         }
-        this.grid.get(key)!.push(unit);
+        cell.push(unit);
     }
 
-    public query(x: number, y: number, radius: number): IUnit[] {
-        const results: IUnit[] = [];
+    /**
+     * Optimized query that populates an output array to avoid Garbage Collection pressure.
+     * @param x Center X
+     * @param y Center Y
+     * @param radius Search Radius
+     * @param out Output array (will be cleared)
+     * @returns number of items found
+     */
+    public query(x: number, y: number, radius: number, out: IUnit[]): number {
+        out.length = 0; // Clear without deallocating
+        const radiusSq = radius * radius;
+        
         const startX = Math.floor((x - radius) / this.cellSize);
         const endX = Math.floor((x + radius) / this.cellSize);
         const startY = Math.floor((y - radius) / this.cellSize);
@@ -41,16 +52,18 @@ export class SpatialHash {
                 const key = `${cx},${cy}`;
                 const cell = this.grid.get(key);
                 if (cell) {
-                    for (const unit of cell) {
+                    const len = cell.length;
+                    for (let i = 0; i < len; i++) {
+                        const unit = cell[i];
                         if (!unit.active || unit.isDead) continue;
                         const distSq = (unit.x - x) ** 2 + (unit.y - y) ** 2;
-                        if (distSq <= radius * radius) {
-                            results.push(unit);
+                        if (distSq <= radiusSq) {
+                            out.push(unit);
                         }
                     }
                 }
             }
         }
-        return results;
+        return out.length;
     }
 }

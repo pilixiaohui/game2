@@ -1,5 +1,4 @@
 
-
 export enum Faction {
   ZERG = 'ZERG',
   HUMAN = 'HUMAN',
@@ -282,18 +281,39 @@ export interface RegionData {
   isFighting: boolean;
 }
 
-// --- v2.0 GENE SYSTEM INTERFACES ---
+// --- v2.0 GENE & ENGINE SYSTEM INTERFACES ---
+
+export interface IGameEngine {
+    // Systems
+    spatialHash: {
+        query: (x: number, y: number, radius: number, out: IUnit[]) => number;
+    };
+    // Utils
+    _sharedQueryBuffer: IUnit[]; // Scratch pad for zero-alloc queries
+    
+    // Actions
+    createExplosion: (x: number, y: number, radius: number, color?: number) => void;
+    createFlash: (x: number, y: number, color: number) => void;
+    createProjectile: (x1: number, y1: number, x2: number, y2: number, color: number) => void;
+    createFloatingText: (x: number, y: number, text: string, color: number, fontSize?: number) => void;
+    createDamagePop: (x: number, y: number, value: number, element: string) => void;
+    
+    dealTrueDamage: (target: IUnit, amount: number) => void;
+    killUnit: (u: IUnit) => void;
+    applyStatus: (target: IUnit, type: StatusType, stacks: number, duration: number) => void;
+    processDamagePipeline: (source: IUnit, target: IUnit) => void;
+}
 
 export interface GeneTrait {
     id: string;
     name: string;
     
     // Lifecycle Hooks
-    onTick?: (self: IUnit, dt: number, engine: any) => void;
-    onMove?: (self: IUnit, velocity: {x:number, y:number}) => void; // Modifies velocity in place
-    onPreAttack?: (self: IUnit, target: IUnit, engine: any) => boolean; // Return false to cancel default melee
-    onHit?: (self: IUnit, target: IUnit, damage: number, engine: any) => void;
-    onDeath?: (self: IUnit, engine: any) => void;
+    onTick?: (self: IUnit, dt: number, engine: IGameEngine) => void;
+    onMove?: (self: IUnit, velocity: {x:number, y:number}, engine: IGameEngine) => void; // Modifies velocity in place
+    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine) => boolean; // Return false to cancel default melee
+    onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine) => void;
+    onDeath?: (self: IUnit, engine: IGameEngine) => void;
 }
 
 export interface IUnit {

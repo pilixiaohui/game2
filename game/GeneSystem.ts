@@ -1,11 +1,38 @@
 
-
-import { GeneTrait, IUnit, ElementType, Faction } from '../types';
+import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType } from '../types';
 import { ELEMENT_COLORS, STATUS_CONFIG, UNIT_CONFIGS } from '../constants';
 
+// --- STATUS REGISTRY (v2.0) ---
+// Handles per-frame updates for statuses to avoid hardcoding in GameEngine
+type StatusHandler = (target: IUnit, dt: number, engine: IGameEngine, stacks: number) => void;
+
+export class StatusRegistry {
+    private static tickHandlers: Partial<Record<StatusType, StatusHandler>> = {};
+
+    static registerTick(type: StatusType, handler: StatusHandler) {
+        this.tickHandlers[type] = handler;
+    }
+
+    static onTick(target: IUnit, type: StatusType, dt: number, engine: IGameEngine) {
+        const effect = target.statuses[type];
+        if (!effect) return;
+        
+        if (this.tickHandlers[type]) {
+            this.tickHandlers[type]!(target, dt, engine, effect.stacks);
+        }
+    }
+}
+
+// Register Standard Status Effects
+StatusRegistry.registerTick('BURNING', (target, dt, engine, stacks) => {
+    engine.dealTrueDamage(target, stacks * 0.5 * dt);
+});
+StatusRegistry.registerTick('POISONED', (target, dt, engine, stacks) => {
+    engine.dealTrueDamage(target, stacks * 0.3 * dt);
+});
+
 // --- ELEMENTAL REACTION REGISTRY (v2.0) ---
-// Replaces hardcoded if-else chains in GameEngine
-type ReactionHandler = (target: IUnit, engine: any, damage: number) => void;
+type ReactionHandler = (target: IUnit, engine: IGameEngine, damage: number) => void;
 
 export class ReactionRegistry {
     private static reactions: Record<string, ReactionHandler> = {};
@@ -14,7 +41,7 @@ export class ReactionRegistry {
         this.reactions[`${statusType}_${elementType}`] = handler;
     }
 
-    static handle(target: IUnit, element: ElementType, engine: any, damage: number) {
+    static handle(target: IUnit, element: ElementType, engine: IGameEngine, damage: number) {
         // Iterate over target's active statuses to find reaction matches
         for (const status in target.statuses) {
             const key = `${status}_${element}`;
@@ -36,7 +63,7 @@ ReactionRegistry.register('FROZEN', 'THERMAL', (target, engine) => {
     }
 });
 
-ReactionRegistry.register('FROZEN', 'PHYSICAL', (target, engine, damage) => {
+ReactionRegistry.register('FROZEN', 'PHYSICAL', (target, engine) => {
     // Shatter: Remove Freeze, Deal Bonus Dmg
     if (target.statuses['FROZEN'] && target.statuses['FROZEN']!.stacks >= STATUS_CONFIG.REACTION_THRESHOLD_MAJOR) {
         delete target.statuses['FROZEN'];
@@ -117,8 +144,11 @@ GeneLibrary.register({
         engine.processDamagePipeline(self, target);
         
         // Cleave (Spatial Query)
-        const neighbors = engine.spatialHash.query(target.x, target.y, 40);
-        for (const n of neighbors) {
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(target.x, target.y, 40, neighbors);
+        
+        for (let i = 0; i < count; i++) {
+            const n = neighbors[i];
             if (n !== target && n.faction !== self.faction && !n.isDead) {
                 engine.processDamagePipeline(self, n);
             }
@@ -157,11 +187,14 @@ GeneLibrary.register({
     name: 'Volatile',
     onDeath: (self, engine) => {
         engine.createExplosion(self.x, self.y, 60, ELEMENT_COLORS[self.stats.element]);
-        const neighbors = engine.spatialHash.query(self.x, self.y, 60);
-        for (const n of neighbors) {
+        
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(self.x, self.y, 60, neighbors);
+        
+        for (let i=0; i<count; i++) {
+            const n = neighbors[i];
             if (n.faction !== self.faction && !n.isDead) {
-                n.stats.hp -= 40;
-                if (n.stats.hp <= 0) engine.killUnit(n);
+                engine.dealTrueDamage(n, 40);
             }
         }
     }
@@ -170,16 +203,43 @@ GeneLibrary.register({
 GeneLibrary.register({
     id: 'GENE_SWARM_MOVEMENT',
     name: 'Swarm Movement',
-    onMove: (self, velocity) => {
-        // Standard movement
+    onMove: (self, velocity, engine) => {
+        // 1. Basic Forward
         velocity.x *= 1.0;
+
+        // 2. Separation (Boids)
+        // Note: We use a small local buffer if we wanted to be perfectly safe recursion-wise,
+        // but since onMove isn't recursive, we use the shared one.
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(self.x, self.y, 40, neighbors);
+        
+        let forceX = 0;
+        let forceY = 0;
+        
+        for (let i = 0; i < count; i++) {
+            const friend = neighbors[i];
+            if (friend === self || friend.faction !== self.faction) continue;
+            
+            const distSq = (self.x - friend.x)**2 + (self.y - friend.y)**2;
+            const minDist = self.radius + friend.radius;
+            
+            if (distSq < minDist * minDist) {
+                // Linear repulsion
+                const factor = 0.1; 
+                forceX += (self.x - friend.x) * factor;
+                forceY += (self.y - friend.y) * factor;
+            }
+        }
+        
+        velocity.x += forceX;
+        velocity.y += forceY;
     }
 });
 
 GeneLibrary.register({
     id: 'GENE_FAST_MOVEMENT',
     name: 'Fast',
-    onMove: (self, velocity) => {
+    onMove: (self, velocity, engine) => {
         velocity.x *= 1.2;
     }
 });
