@@ -10,6 +10,10 @@ export const DECAY_TIME = 2.0;
 export const COLLISION_BUFFER = 10;
 export const MILESTONE_DISTANCE = 1500;
 
+// --- NEW: STAGE CONFIGURATION ---
+export const STAGE_WIDTH = 1200; // Width of one "Sub-Level"
+export const STAGE_TRANSITION_COOLDOWN = 2.0; // Seconds before checking win/loss again after a shift
+
 // Caps and Rates
 export const MAX_RESOURCES_BASE = 2000000; 
 export const INITIAL_LARVA_CAP = 1000;

@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { GameStateSnapshot, UnitType } from '../types';
 import { PLAYABLE_UNITS } from '../constants';
@@ -27,11 +28,21 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate }) => {
             {/* Top Bar: Stats */}
             <div className="flex justify-between items-start w-full pointer-events-auto">
                 
-                {/* Left: Distance Metre */}
-                <div className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded border-l-2 border-red-500 pointer-events-none">
-                    <div className="text-[10px] text-red-400 uppercase tracking-widest">推进距离</div>
-                    <div className="text-2xl font-black font-mono text-white">
-                        {gameState.distance} <span className="text-sm text-gray-500">米</span>
+                {/* Left: Progression Metre */}
+                <div className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded border-l-2 border-red-500 pointer-events-none flex flex-col min-w-[140px]">
+                    <div className="text-[10px] text-red-400 uppercase tracking-widest mb-1">Sector Progress</div>
+                    <div className="flex items-baseline gap-2">
+                        <div className="text-2xl font-black font-mono text-white leading-none">
+                            {gameState.distance}
+                        </div>
+                        <span className="text-xs text-gray-500">/ 100%</span>
+                    </div>
+                    {/* Visual Bar */}
+                    <div className="w-full h-1 bg-gray-800 mt-2 overflow-hidden rounded-full">
+                        <div 
+                            className="h-full bg-red-500 transition-all duration-300"
+                            style={{ width: `${Math.min(100, gameState.distance)}%` }} 
+                        />
                     </div>
                 </div>
                 
@@ -43,10 +54,6 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate }) => {
                             {PLAYABLE_UNITS.map(type => {
                                  const count = (gameState.activeZergCounts && gameState.activeZergCounts[type]) || 0;
                                  const icon = getUnitIcon(type);
-                                 // Only show types with active units to keep it clean, or keep layout consistent?
-                                 // User asked for real-time counts. Showing 0 might be useful for caps check, 
-                                 // but hiding 0s looks cleaner for "active battle". 
-                                 // Let's hide 0s for cleaner UI.
                                  if (count <= 0) return null;
                                  
                                  return (
@@ -65,7 +72,7 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate }) => {
                         <div className="w-px bg-gray-600 h-4"></div>
                         
                         <div>
-                            <span className="text-red-400 mr-2">敌军</span>
+                            <span className="text-red-400 mr-2">HOSTILE</span>
                             {gameState.unitCountHuman}
                         </div>
                     </div>
@@ -74,7 +81,7 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate }) => {
                         onClick={onEvacuate}
                         className="bg-red-900/80 hover:bg-red-700 text-white px-4 py-2 rounded text-xs font-bold uppercase tracking-wider border border-red-500 transition-colors pointer-events-auto shadow-lg"
                     >
-                        撤离战场
+                        撤离 (Evac)
                     </button>
                 </div>
             </div>
