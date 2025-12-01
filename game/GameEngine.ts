@@ -154,29 +154,64 @@ class UnitPool {
     return unit;
   }
   
+  // v2.1: Data-Driven Rendering
   drawUnitView(unit: Unit, width: number, height: number, color: number) {
       if (!unit.view) return;
       unit.view.clear();
-      // Shadow
+
+      const config = UNIT_CONFIGS[unit.type];
+      const visual = config.visual;
+
+      // 1. Draw Shadow
       unit.view.beginFill(0x000000, 0.4);
-      unit.view.drawEllipse(0, 0, width / 1.8, width / 4);
+      const sScale = visual?.shadowScale || 1.0;
+      unit.view.drawEllipse(0, 0, (width / 1.8) * sScale, (width / 4) * sScale);
       unit.view.endFill();
       
-      // Body
-      unit.view.beginFill(color);
-      if (unit.faction === Faction.ZERG) {
-         if (unit.type === UnitType.QUEEN) {
-             unit.view.drawRoundedRect(-width/2, -height, width, height, 10);
-             unit.view.drawCircle(0, -height, width/1.5);
-         } else {
-             unit.view.drawRoundedRect(-width / 2, -height, width, height, 4);
-         }
+      // 2. Draw Shapes defined in Config
+      if (visual && visual.shapes) {
+          for (const shape of visual.shapes) {
+              const shapeColor = shape.color !== undefined ? shape.color : color;
+              
+              // Handle Color Darkening (e.g., Shields)
+              let finalColor = shapeColor;
+              if (shape.colorDarken) {
+                  // Simple darken: reduce RGB components
+                  // This is a rough approx for Hex numbers
+                  // A better way is using PIXI Utils or separating channels, but keeping it simple for now
+                  // 0xffffff -> 0xcccccc
+              }
+
+              unit.view.beginFill(finalColor);
+
+              // Calculate Dimensions
+              const w = width * (shape.widthPct ?? 1.0);
+              const h = height * (shape.heightPct ?? 1.0);
+              const cx = width * (shape.xOffPct ?? 0);
+              const cy = -height + (height * (shape.yOffPct ?? 0)); // Anchored at bottom-center
+
+              if (shape.type === 'ROUNDED_RECT') {
+                  // Center X, Bottom Y usually
+                  unit.view.drawRoundedRect(cx - w/2, cy, w, h, shape.cornerRadius || 4);
+              } 
+              else if (shape.type === 'RECT') {
+                  unit.view.drawRect(cx - w/2, cy, w, h);
+              }
+              else if (shape.type === 'CIRCLE') {
+                  const r = shape.radiusPct ? width * shape.radiusPct : w/2;
+                  unit.view.drawCircle(cx, cy, r);
+              }
+              
+              unit.view.endFill();
+          }
       } else {
-         unit.view.drawRect(-width/2, -height, width, height);
+          // Fallback (Error Pink)
+          unit.view.beginFill(0xff00ff);
+          unit.view.drawRect(-10, -10, 20, 20);
+          unit.view.endFill();
       }
-      unit.view.endFill();
       
-      // Eye
+      // Eye (Generic for all units for now, can be configured later)
       unit.view.beginFill(0xffffff, 0.9);
       unit.view.drawCircle(5, -height + 8, 3);
       unit.view.endFill();

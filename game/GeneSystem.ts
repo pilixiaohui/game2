@@ -233,17 +233,13 @@ GeneLibrary.register({
     }
 });
 
-// --- SWARM MOVEMENT (Optimized v2.0) ---
+// --- v2.1 SPLIT MOVEMENT GENES ---
 
 GeneLibrary.register({
-    id: 'GENE_SWARM_MOVEMENT',
-    name: 'Swarm Movement',
+    id: 'GENE_BASIC_MOVE',
+    name: 'Basic Movement Intent',
     onMove: (self, velocity, dt, engine, params) => {
-        // 1. Base Impulse
-        let baseDx = 0;
-        let baseDy = 0;
-
-        // Stockpile Mode Behavior
+        // Stockpile Mode: Wandering
         if (engine.isStockpileMode && self.faction === Faction.ZERG) {
             self.wanderTimer -= dt;
             if (self.wanderTimer <= 0) { 
@@ -251,10 +247,10 @@ GeneLibrary.register({
                 self.wanderDir = Math.random() > 0.5 ? 1 : -1; 
             }
             // Wander horizontally, slight vertical drift
-            baseDx = self.wanderDir * self.stats.speed * 0.3 * dt;
-            baseDy = (Math.random() - 0.5) * 0.5;
+            velocity.x += self.wanderDir * self.stats.speed * 0.3 * dt;
+            velocity.y += (Math.random() - 0.5) * 0.5;
         } 
-        // Battle Mode Behavior
+        // Battle Mode: Chase or March
         else if (self.target && !self.target.isDead) {
             // Chase logic
             const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
@@ -262,20 +258,27 @@ GeneLibrary.register({
             if (dist > self.stats.range * 0.8) {
                 const dirX = (self.target.x - self.x) / dist;
                 const dirY = (self.target.y - self.y) / dist;
-                baseDx = dirX * self.stats.speed * self.speedVar * dt;
-                baseDy = dirY * self.stats.speed * self.speedVar * dt;
+                velocity.x += dirX * self.stats.speed * self.speedVar * dt;
+                velocity.y += dirY * self.stats.speed * self.speedVar * dt;
             }
         } 
-        // March Logic (Default)
+        // March Logic (Default fallback)
         else {
             const moveDir = self.faction === Faction.ZERG ? 1 : -1;
+            // Only march if speed > 0 (static defenses have speed 0)
             if (self.stats.speed > 0) {
-                baseDx = moveDir * self.stats.speed * self.speedVar * dt;
-                baseDy = Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
+                velocity.x += moveDir * self.stats.speed * self.speedVar * dt;
+                velocity.y += Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
             }
         }
+    }
+});
 
-        // 2. Boids Logic (Time Sliced with Sample & Hold)
+GeneLibrary.register({
+    id: 'GENE_BOIDS',
+    name: 'Boids Physics',
+    onMove: (self, velocity, dt, engine, params) => {
+        // Time Sliced with Sample & Hold
         const frame = Math.floor(Date.now() / 32); 
         const shouldUpdate = (frame + self.frameOffset) % 3 === 0;
 
@@ -330,8 +333,8 @@ GeneLibrary.register({
             self.steeringForce.y = forceY;
         }
 
-        velocity.x += baseDx + (self.steeringForce.x * dt);
-        velocity.y += baseDy + (self.steeringForce.y * dt);
+        velocity.x += (self.steeringForce.x * dt);
+        velocity.y += (self.steeringForce.y * dt);
     }
 });
 

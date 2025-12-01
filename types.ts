@@ -55,6 +55,25 @@ export interface GeneConfig {
     params?: Record<string, any>;
 }
 
+export type VisualShapeType = 'CIRCLE' | 'RECT' | 'ROUNDED_RECT' | 'MODEL_QUEEN';
+
+export interface VisualShapeDef {
+    type: VisualShapeType;
+    color?: number;     // Override unit color
+    colorDarken?: number; // Multiplier to darken (0-1)
+    widthPct?: number;  // % of unit.width (1.0 = 100%)
+    heightPct?: number; // % of unit.height
+    radiusPct?: number; // % of unit.width
+    xOffPct?: number;   // % of unit.width offset from center
+    yOffPct?: number;   // % of unit.height offset from bottom
+    cornerRadius?: number;
+}
+
+export interface UnitVisualConfig {
+    shadowScale?: number;
+    shapes: VisualShapeDef[];
+}
+
 export interface UnitConfig {
     id: UnitType;
     name: string;
@@ -88,6 +107,7 @@ export interface UnitConfig {
         statusPerHit?: number;
     };
     genes?: GeneConfig[];
+    visual?: UnitVisualConfig; // v2.1: Data-driven visuals
     tags?: string[];
 }
 

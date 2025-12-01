@@ -125,10 +125,15 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     baseLoadCapacity: 30,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
     elementConfig: { type: 'PHYSICAL' },
+    visual: {
+        shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 4, widthPct: 1, heightPct: 1 }]
+    },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_MELEE_ATTACK', params: {} },
-        { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 40, separationForce: 2.0, cohesionWeight: 0.2, alignmentWeight: 0.1 } }
+        // v2.1: Split Movement Genes
+        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 2.0, cohesionWeight: 0.2, alignmentWeight: 0.1 } }
     ]
   },
   [UnitType.RANGED]: {
@@ -140,11 +145,15 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     baseLoadCapacity: 30,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'FUNCTION' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
     elementConfig: { type: 'TOXIN', statusPerHit: 10 },
+    visual: {
+        shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 4, widthPct: 1, heightPct: 1 }]
+    },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x8b5cf6 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 35, separationForce: 1.5, cohesionWeight: 0.3 } }
+        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 1.5, cohesionWeight: 0.3 } }
     ]
   },
   [UnitType.PYROVORE]: {
@@ -156,11 +165,15 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     baseLoadCapacity: 40,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }],
     elementConfig: { type: 'THERMAL', statusPerHit: 20 },
+    visual: {
+        shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 8, widthPct: 1, heightPct: 1 }]
+    },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 40 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 45, separationForce: 1.0 } }
+        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_BOIDS', params: { separationRadius: 45, separationForce: 1.0 } }
     ]
   },
   [UnitType.CRYOLISK]: {
@@ -172,12 +185,16 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     baseLoadCapacity: 35,
     slots: [{ polarity: 'FUNCTION' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }],
     elementConfig: { type: 'CRYO', statusPerHit: 8 },
+    visual: {
+        shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 4, widthPct: 1, heightPct: 1 }]
+    },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_FAST_MOVEMENT', params: { multiplier: 1.3 } },
-        { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 35, separationForce: 2.5 } }
+        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 2.5 } }
     ]
   },
   [UnitType.OMEGALIS]: {
@@ -189,12 +206,20 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     baseLoadCapacity: 80,
     slots: [{ polarity: 'DEFENSE' }, { polarity: 'DEFENSE' }, { polarity: 'UNIVERSAL' }, { polarity: 'UNIVERSAL' }],
     elementConfig: { type: 'VOLTAIC', statusPerHit: 25 },
+    visual: {
+        shapes: [
+            { type: 'ROUNDED_RECT', cornerRadius: 10, widthPct: 1, heightPct: 1 },
+            { type: 'RECT', widthPct: 0.2, heightPct: 0.5, xOffPct: -0.4, yOffPct: -0.8 }, // Horns
+            { type: 'RECT', widthPct: 0.2, heightPct: 0.5, xOffPct: 0.4, yOffPct: -0.8 }
+        ]
+    },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_CLEAVE_ATTACK', params: { radius: 60, percentage: 0.5 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_REGEN', params: { rate: 0.05 } },
-        { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 80, separationForce: 3.0 } }
+        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_BOIDS', params: { separationRadius: 80, separationForce: 3.0 } }
     ]
   },
   [UnitType.QUEEN]: {
@@ -205,11 +230,18 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     growthFactors: { hp: 0.1, damage: 0.1 },
     baseLoadCapacity: 50,
     slots: [{ polarity: 'UNIVERSAL' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }],
+    visual: {
+        shapes: [
+            { type: 'ROUNDED_RECT', cornerRadius: 10, widthPct: 1, heightPct: 1 },
+            { type: 'CIRCLE', radiusPct: 0.66, yOffPct: -1.0 } // Head
+        ]
+    },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0xd946ef } },
         { id: 'GENE_REGEN', params: { rate: 0.1 } },
-        { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 60, separationForce: 1.0 } }
+        { id: 'GENE_BASIC_MOVE', params: {} },
+        { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 1.0 } }
     ]
   },
   // Humans
@@ -219,6 +251,9 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 80, damage: 15, range: 200, speed: 0, attackSpeed: 1.0, width: 20, height: 32, color: 0x9ca3af, armor: 10 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
+      visual: {
+          shapes: [{ type: 'RECT', widthPct: 1, heightPct: 1 }]
+      },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_RANGED_ATTACK', params: {} }
@@ -230,6 +265,12 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 300, damage: 10, range: 50, speed: 0, attackSpeed: 1.5, width: 30, height: 34, color: 0x1e3a8a, armor: 50 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
+      visual: {
+          shapes: [
+              { type: 'RECT', widthPct: 1, heightPct: 1 },
+              { type: 'RECT', widthPct: 0.4, heightPct: 1.2, xOffPct: -0.6, colorDarken: 0.2 } // Shield
+          ]
+      },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_MELEE_ATTACK', params: {} }
@@ -241,6 +282,9 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 150, damage: 5, range: 120, speed: 0, attackSpeed: 0.1, width: 24, height: 32, color: 0xea580c, armor: 20 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'THERMAL', statusPerHit: 5 },
+      visual: {
+          shapes: [{ type: 'RECT', widthPct: 1, heightPct: 1 }]
+      },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 10 } }, 
@@ -253,6 +297,9 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 60, damage: 100, range: 500, speed: 0, attackSpeed: 3.5, width: 18, height: 30, color: 0x166534, armor: 5 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
+      visual: {
+          shapes: [{ type: 'RECT', widthPct: 1, heightPct: 1 }]
+      },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 600 } },
           { id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } }
@@ -264,6 +311,12 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 1500, damage: 60, range: 250, speed: 0, attackSpeed: 2.0, width: 50, height: 60, color: 0x475569, armor: 80 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'VOLTAIC', statusPerHit: 25 },
+      visual: {
+          shapes: [
+              { type: 'RECT', widthPct: 1, heightPct: 0.6, yOffPct: -0.4 }, // Legs
+              { type: 'RECT', widthPct: 1.2, heightPct: 0.6, yOffPct: -0.7 } // Torso
+          ]
+      },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_RANGED_ATTACK', params: {} },
