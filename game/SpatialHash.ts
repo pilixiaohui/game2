@@ -3,17 +3,28 @@ import { IUnit } from '../types';
 
 export class SpatialHash {
     private cellSize: number;
-    private grid: Map<string, IUnit[]>;
+    // Map<IntegerKey, Array> - Using number keys avoids string allocation per frame
+    private grid: Map<number, IUnit[]>;
 
     constructor(cellSize: number = 100) {
         this.cellSize = cellSize;
         this.grid = new Map();
     }
 
-    private getKey(x: number, y: number): string {
+    /**
+     * Generates a composite integer key.
+     * Limits:
+     * - Y must be < 1,000,000 (Lane height is ~200, so safe)
+     * - X must be within JS Safe Integer limits when combined.
+     *   Max Safe Integer is 9e15. 
+     *   If key = x + y * 1,000,000
+     *   Max x can be around 9e9 cells. 
+     *   9e9 cells * 100px = 9e11 pixels. Enough for "Endless".
+     */
+    private getKey(x: number, y: number): number {
         const cx = Math.floor(x / this.cellSize);
         const cy = Math.floor(y / this.cellSize);
-        return `${cx},${cy}`;
+        return cx + cy * 1_000_000;
     }
 
     /**
@@ -55,7 +66,7 @@ export class SpatialHash {
 
         for (let cx = startX; cx <= endX; cx++) {
             for (let cy = startY; cy <= endY; cy++) {
-                const key = `${cx},${cy}`;
+                const key = cx + cy * 1_000_000;
                 const cell = this.grid.get(key);
                 if (cell) {
                     const len = cell.length;

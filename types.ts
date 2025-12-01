@@ -5,22 +5,17 @@ export enum Faction {
 }
 
 export enum UnitType {
-  // Zerg Units
   MELEE = 'MELEE',
   RANGED = 'RANGED',
   QUEEN = 'QUEEN',
-  
-  // Elemental Units
-  PYROVORE = 'PYROVORE', // Thermal Artillery
-  CRYOLISK = 'CRYOLISK', // Cryo Assassin
-  OMEGALIS = 'OMEGALIS', // Voltaic Tank
-
-  // Human Units
-  HUMAN_MARINE = 'HUMAN_MARINE',      // Kinetic / Ballistic
-  HUMAN_RIOT = 'HUMAN_RIOT',          // Kinetic / High Armor
-  HUMAN_PYRO = 'HUMAN_PYRO',          // Thermal
-  HUMAN_SNIPER = 'HUMAN_SNIPER',      // Kinetic / High Crit
-  HUMAN_TANK = 'HUMAN_TANK',          // Voltaic / Heavy
+  PYROVORE = 'PYROVORE', 
+  CRYOLISK = 'CRYOLISK', 
+  OMEGALIS = 'OMEGALIS', 
+  HUMAN_MARINE = 'HUMAN_MARINE',     
+  HUMAN_RIOT = 'HUMAN_RIOT',         
+  HUMAN_PYRO = 'HUMAN_PYRO',         
+  HUMAN_SNIPER = 'HUMAN_SNIPER',     
+  HUMAN_TANK = 'HUMAN_TANK',         
 }
 
 export enum HiveSection {
@@ -34,22 +29,20 @@ export enum HiveSection {
   PLAGUE = 'PLAGUE',
 }
 
-// --- CORE ELEMENTAL SYSTEM ---
-
 export type ElementType = 'PHYSICAL' | 'THERMAL' | 'CRYO' | 'VOLTAIC' | 'TOXIN';
 
 export type StatusType = 
-    | 'BURNING'      // Thermal DoT
-    | 'FROZEN'       // Cryo Slow/Stop
-    | 'SHOCKED'      // Voltaic Stun
-    | 'POISONED'     // Toxin DoT
-    | 'ARMOR_BROKEN' // Defense reduced
-    | 'STUNNED';     // General inability to act
+    | 'BURNING'      
+    | 'FROZEN'       
+    | 'SHOCKED'      
+    | 'POISONED'     
+    | 'ARMOR_BROKEN' 
+    | 'STUNNED';     
 
 export interface StatusEffect {
     type: StatusType;
-    stacks: number;      // 0 to 100
-    duration: number;    // Time remaining in seconds
+    stacks: number;      
+    duration: number;    
     decayAccumulator?: number; 
     sourceId?: number;
 }
@@ -84,13 +77,10 @@ export interface UnitConfig {
         polarity: Polarity;
     }[];
     baseLoadCapacity: number;
-    
     elementConfig?: {
         type: ElementType;
         statusPerHit?: number;
     };
-    
-    // v2.0 Composition System
     geneIds?: string[];
     tags?: string[];
 }
@@ -114,8 +104,6 @@ export interface BioPluginConfig {
     stats: PluginStatModifier[];
     statGrowth: number; 
 }
-
-// --- SAVE DATA ---
 
 export interface Resources {
     biomass: number;
@@ -213,8 +201,6 @@ export interface GameSaveData {
     player: PlayerProfile;
 }
 
-// --- DTOs ---
-
 export interface UnitRuntimeStats {
     hp: number;
     maxHp: number;
@@ -226,7 +212,6 @@ export interface UnitRuntimeStats {
     height: number;
     color: number;
     armor: number; 
-    
     critChance: number;
     critDamage: number;
     element: ElementType;
@@ -253,12 +238,10 @@ export interface GameStateSnapshot {
     distance: number;
     unitCountZerg: number;
     unitCountHuman: number;
-    
     stockpileMelee: number;
     stockpileRanged: number;
     stockpileTotal: number;
     populationCap: number; 
-    
     activeZergCounts: Record<string, number>;
     isPaused: boolean;
 }
@@ -275,7 +258,6 @@ export interface RegionData {
   y: number; 
   difficultyMultiplier: number;
   spawnTable?: EnemySpawnConfig[]; 
-  
   devourProgress: number;
   isUnlocked: boolean;
   isFighting: boolean;
@@ -289,7 +271,7 @@ export interface IGameEngine {
         query: (x: number, y: number, radius: number, out: IUnit[]) => number;
     };
     // Utils
-    _sharedQueryBuffer: IUnit[]; // Scratch pad for zero-alloc queries
+    _sharedQueryBuffer: IUnit[]; 
     
     // Actions
     createExplosion: (x: number, y: number, radius: number, color?: number) => void;
@@ -311,14 +293,16 @@ export interface GeneTrait {
     // Lifecycle Hooks
     onTick?: (self: IUnit, dt: number, engine: IGameEngine) => void;
     
-    // Movement Logic: Modifies velocity in place. Includes dt to allow calculating displacement.
+    // Movement Logic
+    // Velocity is passed by reference. Genes should modify it.
     onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine) => void; 
     
-    // Targeting Logic: Returns a valid target or null. If null, engine may fall back to default.
+    // Targeting Logic (New in v2.0 Fix)
+    // Returns a unit to lock onto. If null, engine falls back to default logic.
     onAcquireTarget?: (self: IUnit, potentialTargets: IUnit[], engine: IGameEngine) => IUnit | null;
     
     // Combat Hooks
-    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine) => boolean; // Return false to cancel default melee
+    onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine) => boolean; // Return false to cancel default attack
     onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine) => void;
     onDeath?: (self: IUnit, engine: IGameEngine) => void;
 }
@@ -341,7 +325,7 @@ export interface IUnit {
     target: IUnit | null;
     flashTimer: number;
     
-    // Runtime Fields (Added for v2.0 Type Safety)
+    // Runtime Fields - Promoted to Interface to avoid casting
     decayTimer: number;
     wanderTimer: number;
     wanderDir: number;

@@ -2,8 +2,7 @@
 import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType, Faction } from '../types';
 import { ELEMENT_COLORS, STATUS_CONFIG, UNIT_CONFIGS } from '../constants';
 
-// --- STATUS REGISTRY (v2.0) ---
-// Handles per-frame updates for statuses to avoid hardcoding in GameEngine
+// --- STATUS REGISTRY ---
 type StatusHandler = (target: IUnit, dt: number, engine: IGameEngine, stacks: number) => void;
 
 export class StatusRegistry {
@@ -16,14 +15,12 @@ export class StatusRegistry {
     static onTick(target: IUnit, type: StatusType, dt: number, engine: IGameEngine) {
         const effect = target.statuses[type];
         if (!effect) return;
-        
         if (this.tickHandlers[type]) {
             this.tickHandlers[type]!(target, dt, engine, effect.stacks);
         }
     }
 }
 
-// Register Standard Status Effects
 StatusRegistry.registerTick('BURNING', (target, dt, engine, stacks) => {
     engine.dealTrueDamage(target, stacks * 0.5 * dt);
 });
@@ -31,7 +28,7 @@ StatusRegistry.registerTick('POISONED', (target, dt, engine, stacks) => {
     engine.dealTrueDamage(target, stacks * 0.3 * dt);
 });
 
-// --- ELEMENTAL REACTION REGISTRY (v2.0) ---
+// --- ELEMENTAL REACTION REGISTRY ---
 type ReactionHandler = (target: IUnit, engine: IGameEngine, damage: number) => void;
 
 export class ReactionRegistry {
@@ -42,7 +39,6 @@ export class ReactionRegistry {
     }
 
     static handle(target: IUnit, element: ElementType, engine: IGameEngine, damage: number) {
-        // Iterate over target's active statuses to find reaction matches
         for (const status in target.statuses) {
             const key = `${status}_${element}`;
             if (this.reactions[key]) {
@@ -52,19 +48,16 @@ export class ReactionRegistry {
     }
 }
 
-// Register v2.0 Standard Reactions
 ReactionRegistry.register('FROZEN', 'THERMAL', (target, engine) => {
-    // Thermal Shock: Remove Freeze, Deal Massive Dmg + Explosion
     if (target.statuses['FROZEN'] && target.statuses['FROZEN']!.stacks >= STATUS_CONFIG.REACTION_THRESHOLD_MINOR) {
         delete target.statuses['FROZEN'];
         engine.createFloatingText(target.x, target.y - 50, "THERMAL SHOCK!", 0xffaa00, 16);
         engine.createExplosion(target.x, target.y, 40, 0xffaa00);
-        engine.dealTrueDamage(target, target.stats.maxHp * 0.2); // 20% Max HP
+        engine.dealTrueDamage(target, target.stats.maxHp * 0.2); 
     }
 });
 
 ReactionRegistry.register('FROZEN', 'PHYSICAL', (target, engine) => {
-    // Shatter: Remove Freeze, Deal Bonus Dmg
     if (target.statuses['FROZEN'] && target.statuses['FROZEN']!.stacks >= STATUS_CONFIG.REACTION_THRESHOLD_MAJOR) {
         delete target.statuses['FROZEN'];
         engine.createFloatingText(target.x, target.y - 50, "SHATTER!", 0xa5f3fc, 16);
@@ -74,17 +67,14 @@ ReactionRegistry.register('FROZEN', 'PHYSICAL', (target, engine) => {
 });
 
 ReactionRegistry.register('POISONED', 'VOLTAIC', (target, engine) => {
-    // Corrosion: Armor Break
     engine.applyStatus(target, 'ARMOR_BROKEN', 1, 10);
     engine.createFloatingText(target.x, target.y - 50, "CORRODED!", 0x4ade80, 16);
 });
 
 ReactionRegistry.register('SHOCKED', 'CRYO', (target, engine) => {
-    // Superconduct: Freeze
     engine.applyStatus(target, 'FROZEN', 20, 10);
     engine.createFloatingText(target.x, target.y - 50, "SUPERCONDUCT!", 0x60a5fa, 16);
 });
-
 
 export class GeneLibrary {
     private static genes: Record<string, GeneTrait> = {};
@@ -104,10 +94,9 @@ GeneLibrary.register({
     id: 'GENE_MELEE_ATTACK',
     name: 'Melee Strike',
     onPreAttack: (self, target, engine) => {
-        // Simple instant hit
         engine.createFlash(target.x + (Math.random() * 10 - 5), target.y - 10, ELEMENT_COLORS[self.stats.element] || 0xffffff);
         engine.processDamagePipeline(self, target);
-        return false; // Handled
+        return false; 
     }
 });
 
@@ -117,7 +106,7 @@ GeneLibrary.register({
     onPreAttack: (self, target, engine) => {
         const color = ELEMENT_COLORS[self.stats.element] || 0xffffff;
         engine.createProjectile(self.x, self.y - 15, target.x, target.y - 15, color);
-        return false; // Handled
+        return false; 
     }
 });
 
@@ -125,7 +114,6 @@ GeneLibrary.register({
     id: 'GENE_ARTILLERY_ATTACK',
     name: 'Lobbed Shot',
     onPreAttack: (self, target, engine) => {
-        // Simulate lobbed shot (visual diff for now)
         const color = ELEMENT_COLORS[self.stats.element] || 0xff7777;
         engine.createProjectile(self.x, self.y - 20, target.x, target.y, color); 
         return false;
@@ -136,14 +124,10 @@ GeneLibrary.register({
     id: 'GENE_CLEAVE_ATTACK',
     name: 'Cleave',
     onPreAttack: (self, target, engine) => {
-        // Hit target + enemies nearby
         const color = ELEMENT_COLORS[self.stats.element] || 0xffff00;
         engine.createFlash(target.x, target.y, color);
-        
-        // Main target
         engine.processDamagePipeline(self, target);
         
-        // Cleave (Spatial Query)
         const neighbors = engine._sharedQueryBuffer;
         const count = engine.spatialHash.query(target.x, target.y, 40, neighbors);
         
@@ -163,7 +147,6 @@ GeneLibrary.register({
     onHit: (self, target, damage, engine) => {
         const el = self.stats.element;
         const amount = UNIT_CONFIGS[self.type].elementConfig?.statusPerHit || 10;
-        
         if (el === 'THERMAL') engine.applyStatus(target, 'BURNING', amount, 5);
         if (el === 'CRYO') engine.applyStatus(target, 'FROZEN', amount, 5);
         if (el === 'VOLTAIC') engine.applyStatus(target, 'SHOCKED', amount, 5);
@@ -176,7 +159,7 @@ GeneLibrary.register({
     name: 'Regeneration',
     onTick: (self, dt, engine) => {
         if (self.stats.hp < self.stats.maxHp && !self.isDead) {
-            self.stats.hp += self.stats.maxHp * 0.05 * dt; // 5% per sec
+            self.stats.hp += self.stats.maxHp * 0.05 * dt; 
             if (self.stats.hp > self.stats.maxHp) self.stats.hp = self.stats.maxHp;
         }
     }
@@ -187,10 +170,8 @@ GeneLibrary.register({
     name: 'Volatile',
     onDeath: (self, engine) => {
         engine.createExplosion(self.x, self.y, 60, ELEMENT_COLORS[self.stats.element]);
-        
         const neighbors = engine._sharedQueryBuffer;
         const count = engine.spatialHash.query(self.x, self.y, 60, neighbors);
-        
         for (let i=0; i<count; i++) {
             const n = neighbors[i];
             if (n.faction !== self.faction && !n.isDead) {
@@ -200,12 +181,44 @@ GeneLibrary.register({
     }
 });
 
+// --- HEALER LOGIC (New v2.0 Hook Demo) ---
+GeneLibrary.register({
+    id: 'GENE_HEALER_TARGETING',
+    name: 'Triage Targeting',
+    onAcquireTarget: (self, potentialTargets, engine) => {
+        let lowestHpPct = 1.0;
+        let candidate: IUnit | null = null;
+        
+        // Potential targets comes from spatial query in engine.
+        // We iterate and find wounded friends.
+        for (let i = 0; i < potentialTargets.length; i++) {
+            const u = potentialTargets[i];
+            if (u.faction === self.faction && !u.isDead && u !== self) {
+                const pct = u.stats.hp / u.stats.maxHp;
+                if (pct < lowestHpPct) {
+                    lowestHpPct = pct;
+                    candidate = u;
+                }
+            }
+        }
+        return candidate;
+    },
+    onPreAttack: (self, target, engine) => {
+        // Heal instead of damage
+        engine.createFlash(target.x, target.y - 10, 0x00ff00);
+        target.stats.hp = Math.min(target.stats.maxHp, target.stats.hp + self.stats.damage);
+        engine.createFloatingText(target.x, target.y - 20, `+${Math.floor(self.stats.damage)}`, 0x00ff00, 10);
+        return false; // Prevent default damage
+    }
+});
+
+// --- CORE MOVEMENT ---
+
 GeneLibrary.register({
     id: 'GENE_SWARM_MOVEMENT',
     name: 'Swarm Movement',
     onMove: (self, velocity, dt, engine) => {
-        // velocity input is effectively {0,0} from engine reset
-        // 1. Calculate Base Impulse (Chase or March)
+        // 1. Base Impulse (Chase or March) - REPLACES Engine Logic
         let baseDx = 0;
         let baseDy = 0;
 
@@ -222,13 +235,17 @@ GeneLibrary.register({
             }
         } else {
             // March Forward (no target)
+            // Zerg move Right (1), Humans move Left (-1)
             const moveDir = self.faction === Faction.ZERG ? 1 : -1;
-            baseDx = moveDir * self.stats.speed * self.speedVar * dt;
-            // Bobbing motion for "floating" units
-            baseDy = Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
+            // Only move if not idle (e.g. stationary towers might have speed 0)
+            if (self.stats.speed > 0) {
+                baseDx = moveDir * self.stats.speed * self.speedVar * dt;
+                // Bobbing motion for "floating" units
+                baseDy = Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
+            }
         }
 
-        // 2. Apply Separation (Boids)
+        // 2. Separation (Boids)
         // Use shared buffer from engine to avoid allocation
         const neighbors = engine._sharedQueryBuffer;
         const count = engine.spatialHash.query(self.x, self.y, 40, neighbors);

@@ -6,7 +6,6 @@ import { DataManager } from './DataManager';
 import { GeneLibrary, ReactionRegistry, StatusRegistry } from './GeneSystem';
 import { SpatialHash } from './SpatialHash';
 
-// --- ECS-lite UNIT CLASS ---
 export class Unit implements IUnit {
   active: boolean = false;
   id: number = 0;
@@ -18,7 +17,7 @@ export class Unit implements IUnit {
   y: number = 0;
   radius: number = 15;
   
-  // Compositional Stats (v2.0)
+  // Compositional Stats
   stats: UnitRuntimeStats;
   
   // Runtime Context
@@ -30,7 +29,7 @@ export class Unit implements IUnit {
   isDead: boolean = false;
   target: IUnit | null = null;
   
-  // --- Swarm AI Properties ---
+  // Runtime Fields (IUnit Implementation)
   decayTimer: number = 0;
   wanderTimer: number = 0;
   wanderDir: number = 0;
@@ -505,7 +504,7 @@ export class GameEngine implements IGameEngine {
      if (u.flashTimer > 0) u.flashTimer -= dt;
      this.updateUnitVisuals(u);
 
-     // Stockpile Wander (Special Case, still controlled by Engine for now as it's non-combat)
+     // Stockpile Wander Mode
      if (this.isStockpileMode && u.faction === Faction.ZERG) {
          u.state = 'WANDER';
          u.wanderTimer -= dt;
@@ -518,33 +517,28 @@ export class GameEngine implements IGameEngine {
 
      if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
 
-     // --- Targeting System (Refactored) ---
+     // --- TARGETING SYSTEM (Decoupled v2.0) ---
      const AGGRO_RANGE = 500;
      
-     // 1. Validate existing target
+     // 1. Validation
      if (u.target && (u.target.isDead || !u.target.active || ((u.target.x-u.x)**2 > AGGRO_RANGE**2))) {
          u.target = null;
      }
 
-     // 2. Acquire new target
+     // 2. Acquisition
      if (!u.target) {
          const potentialTargets = this._sharedQueryBuffer;
          const count = this.spatialHash.query(u.x, u.y, AGGRO_RANGE, potentialTargets);
          
-         // GENE HOOK: Targeting (Priority 1)
          let handled = false;
-         for (const g of u.genes) {
-             if (g.onAcquireTarget) {
-                 // Slicing might be slow, passing the buffer and letting gene handle count would be faster in future optimization,
-                 // but for now relying on buffer validity up to count.
-                 // NOTE: Since onAcquireTarget takes IUnit[], we pass the full buffer but the logic inside must respect count if we exposed it.
-                 // However, potentialTargets is just a plain array. 
-                 // Since we cleared it and pushed, potentialTargets.length IS count.
-                 const t = g.onAcquireTarget(u, potentialTargets, this);
-                 if (t) {
-                     u.target = t;
-                     handled = true;
-                     break;
+         
+         // GENE HOOK: Acquire Target (Priority 1)
+         // Useful for Healers to target allies or Snipers to target distant/high-value targets
+         if (u.genes) {
+             for (const g of u.genes) {
+                 if (g.onAcquireTarget) {
+                     const t = g.onAcquireTarget(u, potentialTargets, this);
+                     if (t) { u.target = t; handled = true; break; }
                  }
              }
          }
@@ -553,7 +547,8 @@ export class GameEngine implements IGameEngine {
          if (!handled) {
             let bestDist = Infinity;
             let bestTarget: IUnit | null = null;
-            for (let i = 0; i < potentialTargets.length; i++) {
+            // Iterate up to count because shared buffer might have stale data beyond that
+            for (let i = 0; i < count; i++) {
                  const entity = potentialTargets[i];
                  if (entity.faction === u.faction || entity.isDead) continue;
                  const dist = (entity.x - u.x)**2 + (entity.y - u.y)**2;
@@ -563,12 +558,12 @@ export class GameEngine implements IGameEngine {
          }
      }
 
-     // --- Movement System (Refactored) ---
+     // --- MOVEMENT SYSTEM (Decoupled v2.0) ---
      const velocity = { x: 0, y: 0 };
      let moved = false;
      
      // GENE HOOK: Move
-     // The base vector and separation logic are now inside GENE_SWARM_MOVEMENT or GENE_FAST_MOVEMENT
+     // The base vector (Chasing vs Marching) is now handled INSIDE genes like GENE_SWARM_MOVEMENT
      if (u.genes) {
          for (const g of u.genes) {
             if (g.onMove) {
@@ -578,7 +573,6 @@ export class GameEngine implements IGameEngine {
          }
      }
      
-     // Note: If no gene handles movement, unit stays still (unlike previous hardcoded forward march)
      if (moved) {
         u.x += velocity.x;
         u.y += velocity.y;
@@ -592,7 +586,7 @@ export class GameEngine implements IGameEngine {
          if (Math.abs(velocity.x) > 0.1) u.view.scale.x = velocity.x < 0 ? -1 : 1;
      }
 
-     // --- Combat System ---
+     // --- COMBAT SYSTEM ---
      u.attackCooldown -= dt;
      if (u.target && !u.target.isDead) {
          const dist = Math.sqrt((u.target.x - u.x)**2 + (u.target.y - u.y)**2);
@@ -618,7 +612,7 @@ export class GameEngine implements IGameEngine {
 
   public performAttack(source: IUnit, target: IUnit) {
      let handled = false;
-     // GENE HOOK: PreAttack
+     // GENE HOOK: PreAttack (e.g., suicide bombers, healers, projectiles)
      if (source.genes) {
          for (const g of source.genes) {
              if (g.onPreAttack) {
@@ -628,6 +622,7 @@ export class GameEngine implements IGameEngine {
          }
      }
      
+     // Default Melee
      if (!handled) {
          this.createFlash(target.x, target.y - 10, ELEMENT_COLORS[source.stats.element]); 
          this.processDamagePipeline(source, target);
@@ -644,7 +639,6 @@ export class GameEngine implements IGameEngine {
           effect.duration -= dt;
           if (effect.duration <= 0) { delete unit.statuses[type]; continue; }
           
-          // Delegate to Registry (v2.0)
           StatusRegistry.onTick(unit, type, dt, this);
       }
   }
@@ -685,7 +679,6 @@ export class GameEngine implements IGameEngine {
   public killUnit(u: IUnit) {
       if (u.isDead) return;
       u.isDead = true; u.state = 'DEAD'; 
-      // Type safety: IUnit now has decayTimer
       u.decayTimer = DECAY_TIME;
       
       // GENE HOOK: OnDeath
