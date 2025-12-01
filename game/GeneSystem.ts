@@ -7,9 +7,14 @@ type StatusHandler = (target: IUnit, dt: number, engine: IGameEngine, stacks: nu
 
 export class StatusRegistry {
     private static tickHandlers: Partial<Record<StatusType, StatusHandler>> = {};
+    private static visualTints: Partial<Record<StatusType, number>> = {};
 
     static registerTick(type: StatusType, handler: StatusHandler) {
         this.tickHandlers[type] = handler;
+    }
+    
+    static registerVisual(type: StatusType, tint: number) {
+        this.visualTints[type] = tint;
     }
 
     static onTick(target: IUnit, type: StatusType, dt: number, engine: IGameEngine) {
@@ -19,14 +24,31 @@ export class StatusRegistry {
             this.tickHandlers[type]!(target, dt, engine, effect.stacks);
         }
     }
+    
+    static getVisual(target: IUnit): number | null {
+        // Iterate statuses to find highest priority visual?
+        // Simple first-match for now
+        for(const type in target.statuses) {
+            if (this.visualTints[type as StatusType]) {
+                return this.visualTints[type as StatusType]!;
+            }
+        }
+        return null;
+    }
 }
 
 StatusRegistry.registerTick('BURNING', (target, dt, engine, stacks) => {
     engine.dealTrueDamage(target, stacks * 0.5 * dt);
 });
+StatusRegistry.registerVisual('BURNING', 0xff4500);
+
 StatusRegistry.registerTick('POISONED', (target, dt, engine, stacks) => {
     engine.dealTrueDamage(target, stacks * 0.3 * dt);
 });
+StatusRegistry.registerVisual('POISONED', 0x4ade80);
+
+StatusRegistry.registerVisual('FROZEN', 0x60a5fa);
+StatusRegistry.registerVisual('SHOCKED', 0xfacc15);
 
 // --- ELEMENTAL REACTION REGISTRY ---
 type ReactionHandler = (target: IUnit, engine: IGameEngine, damage: number) => void;
@@ -89,6 +111,32 @@ export class GeneLibrary {
 }
 
 // --- STANDARD GENES ---
+
+GeneLibrary.register({
+    id: 'GENE_ACQUIRE_TARGET',
+    name: 'Targeting System',
+    onAcquireTarget: (self, potentialTargets, engine, params) => {
+        let bestDist = params.range ? params.range ** 2 : Infinity;
+        let bestTarget: IUnit | null = null;
+        
+        // Iterate potential targets from SpatialHash
+        const count = potentialTargets.length;
+        for (let i = 0; i < count; i++) {
+             const entity = potentialTargets[i];
+             if (entity.faction === self.faction || entity.isDead) continue;
+             
+             const dx = entity.x - self.x;
+             const dy = entity.y - self.y;
+             const distSq = dx*dx + dy*dy;
+             
+             if (distSq < bestDist) {
+                 bestDist = distSq;
+                 bestTarget = entity;
+             }
+        }
+        return bestTarget;
+    }
+});
 
 GeneLibrary.register({
     id: 'GENE_MELEE_ATTACK',
@@ -191,11 +239,23 @@ GeneLibrary.register({
     id: 'GENE_SWARM_MOVEMENT',
     name: 'Swarm Movement',
     onMove: (self, velocity, dt, engine, params) => {
-        // 1. Base Impulse (Targeting)
+        // 1. Base Impulse
         let baseDx = 0;
         let baseDy = 0;
 
-        if (self.target && !self.target.isDead) {
+        // Stockpile Mode Behavior
+        if (engine.isStockpileMode && self.faction === Faction.ZERG) {
+            self.wanderTimer -= dt;
+            if (self.wanderTimer <= 0) { 
+                self.wanderTimer = 1 + Math.random() * 2; 
+                self.wanderDir = Math.random() > 0.5 ? 1 : -1; 
+            }
+            // Wander horizontally, slight vertical drift
+            baseDx = self.wanderDir * self.stats.speed * 0.3 * dt;
+            baseDy = (Math.random() - 0.5) * 0.5;
+        } 
+        // Battle Mode Behavior
+        else if (self.target && !self.target.isDead) {
             // Chase logic
             const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
             const dist = Math.sqrt(distSq);
@@ -205,8 +265,9 @@ GeneLibrary.register({
                 baseDx = dirX * self.stats.speed * self.speedVar * dt;
                 baseDy = dirY * self.stats.speed * self.speedVar * dt;
             }
-        } else {
-            // March logic
+        } 
+        // March Logic (Default)
+        else {
             const moveDir = self.faction === Faction.ZERG ? 1 : -1;
             if (self.stats.speed > 0) {
                 baseDx = moveDir * self.stats.speed * self.speedVar * dt;
@@ -215,9 +276,6 @@ GeneLibrary.register({
         }
 
         // 2. Boids Logic (Time Sliced with Sample & Hold)
-        // We calculate forces every N frames but apply the *cached* force every frame.
-        // This avoids the "Stutter" of zeroing out forces on skipped frames.
-        
         const frame = Math.floor(Date.now() / 32); 
         const shouldUpdate = (frame + self.frameOffset) % 3 === 0;
 
@@ -235,7 +293,6 @@ GeneLibrary.register({
             
             let centerX = 0;
             let centerY = 0;
-            let avgVelX = 0; // Approximation of alignment via position diffs isn't perfect but sufficient
             let neighborCount = 0;
 
             for (let i = 0; i < count; i++) {
@@ -246,41 +303,33 @@ GeneLibrary.register({
                 const dy = self.y - friend.y;
                 const distSq = dx*dx + dy*dy;
                 
-                // Separation: Repel from close neighbors
                 if (distSq < sepRadius * sepRadius && distSq > 0.001) {
                     const dist = Math.sqrt(distSq);
-                    // Stronger repel when closer
                     const factor = (sepRadius - dist) / sepRadius; 
                     forceX += (dx / dist) * factor * sepForce;
                     forceY += (dy / dist) * factor * sepForce;
                 }
 
-                // Gather data for Cohesion/Alignment
                 centerX += friend.x;
                 centerY += friend.y;
                 neighborCount++;
             }
 
             if (neighborCount > 0) {
-                // Cohesion: Steer towards center of local flock
                 centerX /= neighborCount;
                 centerY /= neighborCount;
                 forceX += (centerX - self.x) * cohWeight;
                 forceY += (centerY - self.y) * cohWeight;
                 
-                // Alignment: (Simulated) Steer towards general direction of flock flow
-                // Since we don't strictly sync velocity in SpatialHash, we assume right-flow for Zerg
                 if (self.faction === Faction.ZERG) {
                      forceX += aliWeight * 2.0; 
                 }
             }
             
-            // Cache the result
             self.steeringForce.x = forceX;
             self.steeringForce.y = forceY;
         }
 
-        // Apply cached steering forces
         velocity.x += baseDx + (self.steeringForce.x * dt);
         velocity.y += baseDy + (self.steeringForce.y * dt);
     }

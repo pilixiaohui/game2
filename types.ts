@@ -278,6 +278,7 @@ export interface IGameEngine {
     };
     // Utils
     _sharedQueryBuffer: IUnit[]; 
+    isStockpileMode: boolean; // Exposed for Genes
     
     // Actions
     createExplosion: (x: number, y: number, radius: number, color?: number) => void;

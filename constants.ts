@@ -1,5 +1,5 @@
 
-import { UnitType, UnitConfig, RegionData, GameSaveData, Faction, BioPluginConfig, Polarity, ElementType } from './types';
+import { UnitType, UnitConfig, RegionData, GameSaveData, Faction, BioPluginConfig, Polarity, ElementType, UnitState } from './types';
 
 export const SCREEN_PADDING = 100;
 export const LANE_Y = 0; 
@@ -126,6 +126,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
     elementConfig: { type: 'PHYSICAL' },
     genes: [
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 40, separationForce: 2.0, cohesionWeight: 0.2, alignmentWeight: 0.1 } }
     ]
@@ -140,6 +141,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'FUNCTION' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
     elementConfig: { type: 'TOXIN', statusPerHit: 10 },
     genes: [
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x8b5cf6 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 35, separationForce: 1.5, cohesionWeight: 0.3 } }
@@ -155,6 +157,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     slots: [{ polarity: 'ATTACK' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }],
     elementConfig: { type: 'THERMAL', statusPerHit: 20 },
     genes: [
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 40 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 45, separationForce: 1.0 } }
@@ -170,6 +173,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     slots: [{ polarity: 'FUNCTION' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }],
     elementConfig: { type: 'CRYO', statusPerHit: 8 },
     genes: [
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_FAST_MOVEMENT', params: { multiplier: 1.3 } },
@@ -186,6 +190,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     slots: [{ polarity: 'DEFENSE' }, { polarity: 'DEFENSE' }, { polarity: 'UNIVERSAL' }, { polarity: 'UNIVERSAL' }],
     elementConfig: { type: 'VOLTAIC', statusPerHit: 25 },
     genes: [
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_CLEAVE_ATTACK', params: { radius: 60, percentage: 0.5 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_REGEN', params: { rate: 0.05 } },
@@ -201,6 +206,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     baseLoadCapacity: 50,
     slots: [{ polarity: 'UNIVERSAL' }, { polarity: 'FUNCTION' }, { polarity: 'DEFENSE' }],
     genes: [
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0xd946ef } },
         { id: 'GENE_REGEN', params: { rate: 0.1 } },
         { id: 'GENE_SWARM_MOVEMENT', params: { separationRadius: 60, separationForce: 1.0 } }
@@ -213,7 +219,10 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 80, damage: 15, range: 200, speed: 0, attackSpeed: 1.0, width: 20, height: 32, color: 0x9ca3af, armor: 10 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
-      genes: [{ id: 'GENE_RANGED_ATTACK', params: {} }]
+      genes: [
+          { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+          { id: 'GENE_RANGED_ATTACK', params: {} }
+      ]
   },
   [UnitType.HUMAN_RIOT]: {
       id: UnitType.HUMAN_RIOT,
@@ -221,7 +230,10 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 300, damage: 10, range: 50, speed: 0, attackSpeed: 1.5, width: 30, height: 34, color: 0x1e3a8a, armor: 50 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
-      genes: [{ id: 'GENE_MELEE_ATTACK', params: {} }]
+      genes: [
+          { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+          { id: 'GENE_MELEE_ATTACK', params: {} }
+      ]
   },
   [UnitType.HUMAN_PYRO]: {
       id: UnitType.HUMAN_PYRO,
@@ -230,6 +242,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'THERMAL', statusPerHit: 5 },
       genes: [
+          { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 10 } }, 
           { id: 'GENE_ELEMENTAL_HIT', params: {} }
       ]
@@ -240,7 +253,10 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseStats: { hp: 60, damage: 100, range: 500, speed: 0, attackSpeed: 3.5, width: 18, height: 30, color: 0x166534, armor: 5 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
-      genes: [{ id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } }]
+      genes: [
+          { id: 'GENE_ACQUIRE_TARGET', params: { range: 600 } },
+          { id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } }
+      ]
   },
   [UnitType.HUMAN_TANK]: {
       id: UnitType.HUMAN_TANK,
@@ -249,6 +265,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'VOLTAIC', statusPerHit: 25 },
       genes: [
+          { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_RANGED_ATTACK', params: {} },
           { id: 'GENE_ELEMENTAL_HIT', params: {} }
       ]
@@ -284,6 +301,17 @@ export const INITIAL_REGIONS_CONFIG: RegionData[] = [
   { id: 10, name: "最后的方舟", x: 95, y: 20, difficultyMultiplier: 5.0, devourProgress: 0, isUnlocked: false, isFighting: false, spawnTable: [{ type: UnitType.HUMAN_MARINE, weight: 0.1 }, { type: UnitType.HUMAN_RIOT, weight: 0.1 }, { type: UnitType.HUMAN_PYRO, weight: 0.1 }, { type: UnitType.HUMAN_SNIPER, weight: 0.1 }, { type: UnitType.HUMAN_TANK, weight: 0.6 }] },
 ];
 
+const createInitialUnitState = (id: UnitType): UnitState => ({
+    id,
+    level: 1,
+    loadout: [null, null, null, null, null],
+    cap: id === UnitType.MELEE ? 50 : 10,
+    capLevel: 1,
+    efficiencyLevel: 1,
+    isProducing: false,
+    productionProgress: 0
+});
+
 export const INITIAL_GAME_STATE: GameSaveData = {
     resources: {
         biomass: 0,
@@ -294,31 +322,30 @@ export const INITIAL_GAME_STATE: GameSaveData = {
     },
     hive: {
         unlockedUnits: {
-            [UnitType.MELEE]: { id: UnitType.MELEE, level: 1, loadout: [null, null, null, null, null], cap: 20, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
-            [UnitType.RANGED]: { id: UnitType.RANGED, level: 1, loadout: [null, null, null, null, null], cap: 10, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
-            [UnitType.PYROVORE]: { id: UnitType.PYROVORE, level: 1, loadout: [null, null, null], cap: 5, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
-            [UnitType.CRYOLISK]: { id: UnitType.CRYOLISK, level: 1, loadout: [null, null, null], cap: 5, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
-            [UnitType.OMEGALIS]: { id: UnitType.OMEGALIS, level: 1, loadout: [null, null, null, null], cap: 1, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
-            [UnitType.QUEEN]: { id: UnitType.QUEEN, level: 1, loadout: [null, null, null], cap: 1, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
-            // Humans
-            [UnitType.HUMAN_MARINE]: { id: UnitType.HUMAN_MARINE, level: 1, loadout: [], cap: 0, capLevel: 0, efficiencyLevel: 0, isProducing: false, productionProgress: 0 },
-            [UnitType.HUMAN_RIOT]: { id: UnitType.HUMAN_RIOT, level: 1, loadout: [], cap: 0, capLevel: 0, efficiencyLevel: 0, isProducing: false, productionProgress: 0 },
-            [UnitType.HUMAN_PYRO]: { id: UnitType.HUMAN_PYRO, level: 1, loadout: [], cap: 0, capLevel: 0, efficiencyLevel: 0, isProducing: false, productionProgress: 0 },
-            [UnitType.HUMAN_SNIPER]: { id: UnitType.HUMAN_SNIPER, level: 1, loadout: [], cap: 0, capLevel: 0, efficiencyLevel: 0, isProducing: false, productionProgress: 0 },
-            [UnitType.HUMAN_TANK]: { id: UnitType.HUMAN_TANK, level: 1, loadout: [], cap: 0, capLevel: 0, efficiencyLevel: 0, isProducing: false, productionProgress: 0 },
+            [UnitType.MELEE]: { ...createInitialUnitState(UnitType.MELEE), isProducing: true },
+            [UnitType.RANGED]: createInitialUnitState(UnitType.RANGED),
+            [UnitType.QUEEN]: { ...createInitialUnitState(UnitType.QUEEN), cap: 5 },
+            [UnitType.PYROVORE]: createInitialUnitState(UnitType.PYROVORE),
+            [UnitType.CRYOLISK]: createInitialUnitState(UnitType.CRYOLISK),
+            [UnitType.OMEGALIS]: createInitialUnitState(UnitType.OMEGALIS),
+            [UnitType.HUMAN_MARINE]: createInitialUnitState(UnitType.HUMAN_MARINE),
+            [UnitType.HUMAN_RIOT]: createInitialUnitState(UnitType.HUMAN_RIOT),
+            [UnitType.HUMAN_PYRO]: createInitialUnitState(UnitType.HUMAN_PYRO),
+            [UnitType.HUMAN_SNIPER]: createInitialUnitState(UnitType.HUMAN_SNIPER),
+            [UnitType.HUMAN_TANK]: createInitialUnitState(UnitType.HUMAN_TANK),
         },
         unitStockpile: {
-            [UnitType.MELEE]: 0,
-            [UnitType.RANGED]: 0,
-            [UnitType.PYROVORE]: 0,
-            [UnitType.CRYOLISK]: 0,
-            [UnitType.OMEGALIS]: 0,
-            [UnitType.QUEEN]: 1,
-            [UnitType.HUMAN_MARINE]: 0,
-            [UnitType.HUMAN_RIOT]: 0,
-            [UnitType.HUMAN_PYRO]: 0,
-            [UnitType.HUMAN_SNIPER]: 0,
-            [UnitType.HUMAN_TANK]: 0
+             [UnitType.MELEE]: 0,
+             [UnitType.RANGED]: 0,
+             [UnitType.QUEEN]: 1,
+             [UnitType.PYROVORE]: 0,
+             [UnitType.CRYOLISK]: 0,
+             [UnitType.OMEGALIS]: 0,
+             [UnitType.HUMAN_MARINE]: 0,
+             [UnitType.HUMAN_RIOT]: 0,
+             [UnitType.HUMAN_PYRO]: 0,
+             [UnitType.HUMAN_SNIPER]: 0,
+             [UnitType.HUMAN_TANK]: 0
         },
         production: {
             larvaCapBase: INITIAL_LARVA_CAP,
@@ -361,9 +388,7 @@ export const INITIAL_GAME_STATE: GameSaveData = {
     },
     world: {
         currentRegionId: 1,
-        regions: {
-            1: { id: 1, isUnlocked: true, devourProgress: 0 }
-        }
+        regions: {}
     },
     player: {
         lastSaveTime: Date.now(),

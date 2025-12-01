@@ -5,20 +5,18 @@ export class SpatialHash {
     private cellSize: number;
     private grid: Map<number, IUnit[]>;
 
-    // We use a large multiplier to simulate a 2D key in a 1D Map.
-    // Ensure Y component doesn't overlap X. 
-    // Max Map Width assumed < 1,000,000 cells (100,000,000 pixels).
-    private readonly Y_MULTIPLIER = 1_000_000;
-
     constructor(cellSize: number = 100) {
         this.cellSize = cellSize;
         this.grid = new Map();
     }
 
     private getKey(x: number, y: number): number {
-        const cx = Math.floor(x / this.cellSize);
-        const cy = Math.floor(y / this.cellSize);
-        return cx + cy * this.Y_MULTIPLIER;
+        // Bitwise packing: 16 bits for X, 16 bits for Y.
+        // Range: -32768 to 32767 cells.
+        // At 100px cell size, this covers +/- 3,276,800 pixels.
+        const cx = Math.floor(x / this.cellSize) & 0xFFFF;
+        const cy = Math.floor(y / this.cellSize) & 0xFFFF;
+        return cx | (cy << 16);
     }
 
     /**
@@ -60,7 +58,8 @@ export class SpatialHash {
 
         for (let cx = startX; cx <= endX; cx++) {
             for (let cy = startY; cy <= endY; cy++) {
-                const key = cx + cy * this.Y_MULTIPLIER;
+                // Manually pack key to match getKey
+                const key = (cx & 0xFFFF) | ((cy & 0xFFFF) << 16);
                 const cell = this.grid.get(key);
                 if (cell) {
                     const len = cell.length;

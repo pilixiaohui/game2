@@ -510,65 +510,33 @@ export class GameEngine implements IGameEngine {
      if (u.flashTimer > 0) u.flashTimer -= dt;
      this.updateUnitVisuals(u);
 
-     // Stockpile Wander Mode
-     if (this.isStockpileMode && u.faction === Faction.ZERG) {
-         u.state = 'WANDER';
-         u.wanderTimer -= dt;
-         if (u.wanderTimer <= 0) { u.wanderTimer = 1 + Math.random() * 2; u.wanderDir = Math.random() > 0.5 ? 1 : -1; }
-         u.x += u.wanderDir * u.stats.speed * 0.3 * dt;
-         u.y += (Math.random() - 0.5) * 0.5;
-         if (u.view) { u.view.position.x = u.x; u.view.y = u.y; u.view.zIndex = u.y; }
-         return; 
-     }
-
      if (u.statuses['SHOCKED'] && Math.random() < 0.05) return; 
 
-     // --- TARGETING SYSTEM (Decoupled v2.0) ---
-     const AGGRO_RANGE = 500;
-     
+     // --- TARGETING SYSTEM (Gene Based) ---
+     const AGGRO_RANGE = 600;
+     const potentialTargets = this._sharedQueryBuffer;
+     this.spatialHash.query(u.x, u.y, AGGRO_RANGE, potentialTargets);
+
      // 1. Validation
      if (u.target && (u.target.isDead || !u.target.active || ((u.target.x-u.x)**2 > AGGRO_RANGE**2))) {
          u.target = null;
      }
 
-     // 2. Acquisition
-     if (!u.target) {
-         const potentialTargets = this._sharedQueryBuffer;
-         const count = this.spatialHash.query(u.x, u.y, AGGRO_RANGE, potentialTargets);
-         
-         let handled = false;
-         
-         // GENE HOOK: Acquire Target (Priority 1)
-         if (u.geneConfig) {
-             for (const cfg of u.geneConfig) {
-                 const gene = GeneLibrary.get(cfg.id);
-                 if (gene && gene.onAcquireTarget) {
-                     const t = gene.onAcquireTarget(u, potentialTargets, this, cfg.params || {});
-                     if (t) { u.target = t; handled = true; break; }
-                 }
+     // 2. Acquisition (Delegated to Gene)
+     if (!u.target && u.geneConfig) {
+         for (const cfg of u.geneConfig) {
+             const gene = GeneLibrary.get(cfg.id);
+             if (gene && gene.onAcquireTarget) {
+                 const t = gene.onAcquireTarget(u, potentialTargets, this, cfg.params || {});
+                 if (t) { u.target = t; break; }
              }
-         }
-
-         // Engine Default: Nearest Enemy (Priority 2)
-         if (!handled) {
-            let bestDist = Infinity;
-            let bestTarget: IUnit | null = null;
-            // Iterate up to count because shared buffer might have stale data beyond that
-            for (let i = 0; i < count; i++) {
-                 const entity = potentialTargets[i];
-                 if (entity.faction === u.faction || entity.isDead) continue;
-                 const dist = (entity.x - u.x)**2 + (entity.y - u.y)**2;
-                 if (dist < bestDist) { bestDist = dist; bestTarget = entity; }
-            }
-            u.target = bestTarget;
          }
      }
 
-     // --- MOVEMENT SYSTEM (Decoupled v2.0) ---
+     // --- MOVEMENT SYSTEM (Gene Based) ---
      const velocity = { x: 0, y: 0 };
      let moved = false;
      
-     // GENE HOOK: Move
      if (u.geneConfig) {
          for (const cfg of u.geneConfig) {
             const gene = GeneLibrary.get(cfg.id);
@@ -609,11 +577,10 @@ export class GameEngine implements IGameEngine {
   public updateUnitVisuals(u: IUnit) {
       if (!u.view) return;
       if (u.flashTimer > 0) { u.view.tint = 0xffffaa; return; }
-      let tint = 0xffffff;
-      if (u.statuses['BURNING']) tint = 0xff4500;
-      else if (u.statuses['FROZEN']) tint = 0x60a5fa;
-      else if (u.statuses['POISONED']) tint = 0x4ade80;
-      u.view.tint = tint;
+      
+      // Decoupled Visuals via Registry
+      const statusTint = StatusRegistry.getVisual(u);
+      u.view.tint = statusTint !== null ? statusTint : 0xffffff;
   }
 
   public performAttack(source: IUnit, target: IUnit) {
@@ -629,7 +596,7 @@ export class GameEngine implements IGameEngine {
          }
      }
      
-     // Default Melee
+     // Default Melee (If no gene handled it)
      if (!handled) {
          this.createFlash(target.x, target.y - 10, ELEMENT_COLORS[source.stats.element]); 
          this.processDamagePipeline(source, target);
