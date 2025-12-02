@@ -1,12 +1,13 @@
 
 
 import React from 'react';
-import { GameStateSnapshot, UnitType } from '../types';
+import { GameStateSnapshot, UnitType, RegionData } from '../types';
 import { PLAYABLE_UNITS } from '../constants';
 
 interface HUDProps {
     gameState: GameStateSnapshot;
     onEvacuate: () => void;
+    activeRegion: RegionData | null;
 }
 
 // Helper for icon/color configuration
@@ -22,9 +23,12 @@ const getUnitIcon = (type: string) => {
     }
 };
 
-export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate }) => {
+export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate, activeRegion }) => {
+    const maxStages = activeRegion ? activeRegion.totalStages : 100;
+    const progressPercent = Math.min(100, (gameState.distance / maxStages) * 100);
+
     return (
-        <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
+        <div className="absolute top-8 left-0 w-full pointer-events-none flex flex-col justify-between p-4 z-10">
             {/* Top Bar: Stats */}
             <div className="flex justify-between items-start w-full pointer-events-auto">
                 
@@ -35,13 +39,13 @@ export const HUD: React.FC<HUDProps> = ({ gameState, onEvacuate }) => {
                         <div className="text-2xl font-black font-mono text-white leading-none">
                             {gameState.distance}
                         </div>
-                        <span className="text-xs text-gray-500">/ 100%</span>
+                        <span className="text-xs text-gray-500">/ {maxStages} STAGES</span>
                     </div>
                     {/* Visual Bar */}
                     <div className="w-full h-1 bg-gray-800 mt-2 overflow-hidden rounded-full">
                         <div 
                             className="h-full bg-red-500 transition-all duration-300"
-                            style={{ width: `${Math.min(100, gameState.distance)}%` }} 
+                            style={{ width: `${progressPercent}%` }} 
                         />
                     </div>
                 </div>

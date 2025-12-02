@@ -1,7 +1,7 @@
 
 
 import { GameSaveData, UnitType, UnitRuntimeStats, Resources, GameModifiers, BioPluginConfig, PluginInstance, ElementType } from '../types';
-import { INITIAL_GAME_STATE, UNIT_CONFIGS, UNIT_UPGRADE_COST_BASE, RECYCLE_REFUND_RATE, METABOLISM_FACILITIES, MAX_RESOURCES_BASE, BIO_PLUGINS, CAP_UPGRADE_BASE, EFFICIENCY_UPGRADE_BASE, QUEEN_UPGRADE_BASE, INITIAL_LARVA_CAP, CLICK_CONFIG } from '../constants';
+import { INITIAL_GAME_STATE, UNIT_CONFIGS, UNIT_UPGRADE_COST_BASE, RECYCLE_REFUND_RATE, METABOLISM_FACILITIES, MAX_RESOURCES_BASE, BIO_PLUGINS, CAP_UPGRADE_BASE, EFFICIENCY_UPGRADE_BASE, QUEEN_UPGRADE_BASE, INITIAL_LARVA_CAP, CLICK_CONFIG, INITIAL_REGIONS_CONFIG } from '../constants';
 
 export type Listener = (data: any) => void;
 
@@ -698,8 +698,11 @@ export class DataManager {
     }
     public updateRegionProgress(id: number, delta: number) {
         if (!this.state.world.regions[id]) return;
-        this.state.world.regions[id].devourProgress = Math.min(100, this.state.world.regions[id].devourProgress + delta);
-        if (this.state.world.regions[id].devourProgress >= 100 && id < 10) this.unlockRegion(id+1);
+        const regionConfig = INITIAL_REGIONS_CONFIG.find(r => r.id === id);
+        const maxStages = regionConfig ? regionConfig.totalStages : 100;
+
+        this.state.world.regions[id].devourProgress = Math.min(maxStages, this.state.world.regions[id].devourProgress + delta);
+        if (this.state.world.regions[id].devourProgress >= maxStages && id < 5) this.unlockRegion(id+1);
         this.events.emit('REGION_PROGRESS', {id, progress: this.state.world.regions[id].devourProgress});
     }
 

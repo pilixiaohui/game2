@@ -1,3 +1,4 @@
+
 import { UnitType, UnitConfig } from '../../types';
 
 export const HUMAN_UNIT_CONFIGS: Partial<Record<UnitType, UnitConfig>> = {
@@ -8,7 +9,7 @@ export const HUMAN_UNIT_CONFIGS: Partial<Record<UnitType, UnitConfig>> = {
   
   [UnitType.HUMAN_MARINE]: { // [Existing] 标准单位
       id: UnitType.HUMAN_MARINE, name: '陆战队员 (Marine)',
-      baseStats: { hp: 80, damage: 15, range: 220, speed: 80, attackSpeed: 0.8, width: 20, height: 32, color: 0x4ade80, armor: 5 },
+      baseStats: { hp: 80, damage: 20, range: 220, speed: 80, attackSpeed: 0.8, width: 20, height: 32, color: 0x4ade80, armor: 5 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
       elementConfig: { type: 'PHYSICAL' },
       visual: { shapes: [{ type: 'RECT', widthPct: 0.8, heightPct: 1, color: 0x333333 }, { type: 'CIRCLE', radiusPct: 0.4, yOffPct: -0.8, color: 0x4ade80 }] }, // 绿色头盔
@@ -73,16 +74,17 @@ export const HUMAN_UNIT_CONFIGS: Partial<Record<UnitType, UnitConfig>> = {
           { id: 'GENE_COMBAT_MOVEMENT' },
           { id: 'GENE_AUTO_ATTACK' },
           { id: 'GENE_MELEE_ATTACK' },
-          { id: 'GENE_HARDENED_SKIN', params: { amount: 10 } }, // 物理减伤
+          { id: 'GENE_HARDENED_SKIN', params: { amount: 5 } }, // Nerfed from 10 to 5 to allow chip damage
           { id: 'GENE_BOIDS', params: { separationRadius: 35 } }
       ]
   },
   [UnitType.HUMAN_PYRO]: { // [Existing] 火焰兵
       id: UnitType.HUMAN_PYRO,
       name: '火焰兵 (Pyro)',
-      baseStats: { hp: 150, damage: 5, range: 120, speed: 60, attackSpeed: 0.1, width: 24, height: 32, color: 0xea580c, armor: 20 },
+      // REBALANCE: Slower attack speed (0.1 -> 0.5), higher damage (5 -> 25). Same DPS, less lag/instant stacks.
+      baseStats: { hp: 150, damage: 25, range: 120, speed: 60, attackSpeed: 0.5, width: 24, height: 32, color: 0xea580c, armor: 20 },
       baseCost: {} as any, growthFactors: {} as any, slots: [], baseLoadCapacity: 0,
-      elementConfig: { type: 'THERMAL', statusPerHit: 5 },
+      elementConfig: { type: 'THERMAL', statusPerHit: 20 }, // Increased status per hit since hits are slower
       visual: { shapes: [{ type: 'RECT', widthPct: 1, heightPct: 1 }] },
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },

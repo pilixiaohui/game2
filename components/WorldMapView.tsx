@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { RegionData } from '../types';
 
@@ -105,8 +106,10 @@ export const WorldMapView: React.FC<WorldMapViewProps> = ({ globalState, onEnter
         {globalState.regions.map((region) => {
             const isLocked = !region.isUnlocked;
             const isActive = region.id === activeRegionId;
-            const isCompleted = region.devourProgress >= 100;
+            const maxStages = region.totalStages || 100;
+            const isCompleted = region.devourProgress >= maxStages;
             const isFighting = region.isFighting || isActive;
+            const progressPercent = Math.min(100, (region.devourProgress / maxStages) * 100);
             
             // Dynamic Coloring
             let nodeColor = 'bg-gray-800 border-gray-600'; // Locked
@@ -115,7 +118,7 @@ export const WorldMapView: React.FC<WorldMapViewProps> = ({ globalState, onEnter
             if (!isLocked) {
                 if (region.devourProgress === 0) {
                      nodeColor = 'bg-white border-blue-400'; // Neutral
-                } else if (region.devourProgress < 100) {
+                } else if (!isCompleted) {
                      nodeColor = 'bg-red-900 border-red-500'; // Contested
                      glowColor = 'shadow-[0_0_15px_rgba(239,68,68,0.6)]';
                 } else {
@@ -157,13 +160,14 @@ export const WorldMapView: React.FC<WorldMapViewProps> = ({ globalState, onEnter
                                 {region.name}
                             </div>
                             {!isLocked && (
-                                <div className="w-full bg-gray-800 h-1 mt-1 rounded-full overflow-hidden">
+                                <div className="w-full bg-gray-800 h-1 mt-1 rounded-full overflow-hidden relative">
                                     <div 
                                         className="h-full bg-red-500 transition-all duration-500" 
-                                        style={{ width: `${region.devourProgress}%` }}
+                                        style={{ width: `${progressPercent}%` }}
                                     />
                                 </div>
                             )}
+                            <div className="text-[8px] text-gray-500 mt-1">STAGE {region.devourProgress} / {maxStages}</div>
                         </div>
                         {/* Little triangle arrow */}
                         <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[4px] border-b-gray-700 rotate-180 -mt-[1px]"></div>

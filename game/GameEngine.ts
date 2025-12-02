@@ -121,8 +121,8 @@ class UnitPool {
         stats = DataManager.instance.getUnitStats(type, modifiers);
     } else {
         stats = {
-            hp: config.baseStats.hp * (1 + (x/5000)),
-            maxHp: config.baseStats.hp * (1 + (x/5000)),
+            hp: config.baseStats.hp,
+            maxHp: config.baseStats.hp,
             damage: config.baseStats.damage,
             range: config.baseStats.range,
             speed: config.baseStats.speed,
@@ -263,6 +263,8 @@ export class GameEngine implements IGameEngine {
 
   public humanDifficultyMultiplier: number = 1.0;
   public activeRegionId: number = 0;
+  public combatEnabled: boolean = true; // NEW: Controls deployment
+
   private deploymentTimer: number = 0; 
   private humanSpawnTimer: number = 0;
   
@@ -503,19 +505,43 @@ export class GameEngine implements IGameEngine {
       if (!this.unitPool) return;
       const stageStart = stageIdx * STAGE_WIDTH;
       const width = STAGE_WIDTH;
-      const difficultyMult = 1 + (stageIdx / 100) * this.humanDifficultyMultiplier * 3.0;
-      const count = Math.floor((3 + Math.random() * 3) * difficultyMult);
+      
       const regionConfig = INITIAL_REGIONS_CONFIG.find(r => r.id === this.activeRegionId);
-      const spawnTable = regionConfig?.spawnTable || [{ type: UnitType.HUMAN_MARINE, weight: 1.0 }];
+      if (!regionConfig) return;
+
+      const totalStages = regionConfig.totalStages;
+      const difficulty = this.humanDifficultyMultiplier * (1 + (stageIdx / totalStages) * 0.5); // +50% growth across region
+
+      const count = Math.floor((3 + Math.random() * 3) * difficulty);
+      const spawnTable = regionConfig.spawnTable || [{ type: UnitType.HUMAN_MARINE, weight: 1.0 }];
+
+      // Helper for weighted random
+      const getTotalWeight = () => spawnTable.reduce((a, b) => a + b.weight, 0);
+      const getWeightedType = () => {
+           const total = getTotalWeight();
+           let r = Math.random() * total;
+           for(const entry of spawnTable) {
+               if (r < entry.weight) return entry.type;
+               r -= entry.weight;
+           }
+           return spawnTable[0].type;
+      };
 
       for(let i=0; i<count; i++) {
            const x = stageStart + Math.random() * width;
-           const u = this.unitPool.spawn(Faction.HUMAN, spawnTable[0].type, x, this.modifiers);
-           if (u) u.state = 'MOVE';
+           const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), x, this.modifiers);
+           // Apply Stage HP scaling (visualized by size, but logic is stats)
+           if (u) {
+               u.state = 'MOVE';
+               const hpScale = 1 + (stageIdx / 50); // Global scaling
+               u.stats.maxHp *= hpScale;
+               u.stats.hp = u.stats.maxHp;
+           }
       }
   }
 
   private spawnZergWaveInStage(stageIdx: number) {
+      if (!this.combatEnabled) return; // RECON MODE: No automatic Zerg spawns
       if (!this.unitPool) return;
       const stageStart = stageIdx * STAGE_WIDTH;
       const stockpile = DataManager.instance.state.hive.unitStockpile;
@@ -612,6 +638,10 @@ export class GameEngine implements IGameEngine {
 
   private checkStageProgression() {
       if (!this.unitPool || this.gracePeriodTimer > 0) return;
+      
+      const regionConfig = INITIAL_REGIONS_CONFIG.find(r => r.id === this.activeRegionId);
+      const totalStages = regionConfig ? regionConfig.totalStages : 100;
+      
       const stageStart = this.currentStageIndex * STAGE_WIDTH;
       const stageEnd = (this.currentStageIndex + 1) * STAGE_WIDTH;
       
@@ -621,10 +651,9 @@ export class GameEngine implements IGameEngine {
       const humanCount = active.filter(u => u.faction === Faction.HUMAN && u.x >= stageStart && u.x <= stageEnd).length;
       
       // Zerg count should include reinforcements coming from the previous sector (Flood logic)
-      // This prevents retreating just because the vanguard hasn't crossed the camera line yet
       const zergCount = active.filter(u => u.faction === Faction.ZERG && u.x >= (stageStart - STAGE_WIDTH * 0.8) && u.x <= (stageEnd + 500)).length;
       
-      if (humanCount === 0 && zergCount > 0 && this.currentStageIndex < 100) {
+      if (humanCount === 0 && zergCount > 0 && this.currentStageIndex < totalStages) {
           this.advanceStage();
       } else if (humanCount > 0 && zergCount === 0 && this.currentStageIndex > 0) {
           this.retreatStage();
@@ -636,7 +665,7 @@ export class GameEngine implements IGameEngine {
       this.stageTransitionTimer = STAGE_TRANSITION_COOLDOWN;
       this.gracePeriodTimer = 1.0;
       this.createFloatingText(this.cameraX, LANE_Y - 100, "SECTOR CLEARED", 0x4ade80, 32);
-      if (this.activeRegionId) DataManager.instance.updateRegionProgress(this.activeRegionId, 1);
+      if (this.activeRegionId && this.combatEnabled) DataManager.instance.updateRegionProgress(this.activeRegionId, 1);
       this.spawnHumanWaveInStage(this.currentStageIndex + 1);
   }
 
@@ -645,12 +674,12 @@ export class GameEngine implements IGameEngine {
       this.stageTransitionTimer = STAGE_TRANSITION_COOLDOWN;
       this.gracePeriodTimer = 1.0; 
       this.createFloatingText(this.cameraX, LANE_Y - 100, "FALLBACK!", 0xf87171, 32);
-      if (this.activeRegionId) DataManager.instance.updateRegionProgress(this.activeRegionId, -1);
+      if (this.activeRegionId && this.combatEnabled) DataManager.instance.updateRegionProgress(this.activeRegionId, -1);
       this.spawnHumanWaveInStage(this.currentStageIndex);
   }
 
   private handleDeployment(dt: number) {
-    if (!this.app || !this.unitPool) return;
+    if (!this.app || !this.unitPool || !this.combatEnabled) return; // RECON MODE: No Deployment
     this.deploymentTimer += dt;
     if (this.deploymentTimer < 0.1) return; 
     this.deploymentTimer = 0;
@@ -677,16 +706,43 @@ export class GameEngine implements IGameEngine {
 
   private handleHumanSpawning(dt: number) {
     if (!this.app || !this.unitPool) return;
-    const difficultyMult = 1 + (this.currentStageIndex / 100) * this.humanDifficultyMultiplier * 3.0; 
-    const baseHumanInterval = Math.max(0.5, 4.0 / difficultyMult); 
+    
+    const regionConfig = INITIAL_REGIONS_CONFIG.find(r => r.id === this.activeRegionId);
+    if (!regionConfig) return;
+    const totalStages = regionConfig.totalStages;
+
+    // Difficulty scales based on Region Multiplier + Stage Progress (0 to 1)
+    const difficulty = this.humanDifficultyMultiplier * (1 + (this.currentStageIndex / totalStages) * 0.5); 
+    
+    const baseHumanInterval = Math.max(0.5, 4.0 / difficulty); 
     this.humanSpawnTimer += dt;
     if (this.humanSpawnTimer > baseHumanInterval) {
         this.humanSpawnTimer = 0;
         const spawnZoneStart = (this.currentStageIndex + 1) * STAGE_WIDTH + 100;
         const spawnZoneEnd = (this.currentStageIndex + 2) * STAGE_WIDTH - 200;
         const spawnX = spawnZoneStart + Math.random() * (spawnZoneEnd - spawnZoneStart);
-        const u = this.unitPool.spawn(Faction.HUMAN, UnitType.HUMAN_MARINE, spawnX, this.modifiers);
-        if (u) u.state = 'MOVE'; 
+        
+        // Spawn Logic reused from wave spawner to get weighted type
+        const spawnTable = regionConfig.spawnTable || [{ type: UnitType.HUMAN_MARINE, weight: 1.0 }];
+        const getTotalWeight = () => spawnTable.reduce((a, b) => a + b.weight, 0);
+        const getWeightedType = () => {
+           const total = getTotalWeight();
+           let r = Math.random() * total;
+           for(const entry of spawnTable) {
+               if (r < entry.weight) return entry.type;
+               r -= entry.weight;
+           }
+           return spawnTable[0].type;
+        };
+
+        const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), spawnX, this.modifiers);
+        if (u) {
+            u.state = 'MOVE';
+             // Apply HP Scale
+            const hpScale = 1 + (this.currentStageIndex / 50); 
+            u.stats.maxHp *= hpScale;
+            u.stats.hp = u.stats.maxHp;
+        }
     }
   }
 

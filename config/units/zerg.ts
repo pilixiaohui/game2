@@ -1,5 +1,4 @@
 
-
 import { UnitType, UnitConfig } from '../../types';
 
 export const PLAYABLE_UNITS = [
@@ -100,7 +99,8 @@ export const ZERG_UNIT_CONFIGS: Partial<Record<UnitType, UnitConfig>> = {
   [UnitType.PYROVORE]: {
     id: UnitType.PYROVORE,
     name: '爆裂虫 (Scourge)',
-    baseStats: { hp: 60, damage: 50, range: 280, speed: 250, attackSpeed: 0.8, width: 28, height: 28, color: 0xf87171, armor: 0 },
+    // Slight Nerf: Reduced speed to 220 from 250 to allow interception
+    baseStats: { hp: 60, damage: 50, range: 280, speed: 220, attackSpeed: 0.8, width: 28, height: 28, color: 0xf87171, armor: 0 },
     baseCost: { biomass: 60, larva: 1, dna: 0, time: 5.0 },
     growthFactors: { hp: 0.15, damage: 0.3 },
     baseLoadCapacity: 40,
@@ -150,7 +150,7 @@ export const ZERG_UNIT_CONFIGS: Partial<Record<UnitType, UnitConfig>> = {
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_CLEAVE_ATTACK', params: { radius: 80 } },
         { id: 'GENE_THORNS', params: { ratio: 0.5 } },
-        { id: 'GENE_HARDENED_SKIN', params: { amount: 15 } },
+        { id: 'GENE_HARDENED_SKIN', params: { amount: 10 } }, // Reduced from 15 to 10
         { id: 'GENE_STUN_HIT', params: { chance: 0.2 } },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
         { id: 'GENE_BOIDS', params: { separationRadius: 70, separationForce: 400.0, cohesionWeight: 0.01 } }
@@ -179,7 +179,8 @@ export const ZERG_UNIT_CONFIGS: Partial<Record<UnitType, UnitConfig>> = {
   [UnitType.ZERGLING_RAPTOR]: {
         id: UnitType.ZERGLING_RAPTOR,
         name: '迅猛跳虫',
-        baseStats: { hp: 40, damage: 10, range: 20, speed: 240, attackSpeed: 0.3, width: 20, height: 20, color: 0xcccccc, armor: 0 },
+        // REBALANCE: HP reduced from 40 to 35 to emphasize glass cannon nature
+        baseStats: { hp: 35, damage: 10, range: 20, speed: 240, attackSpeed: 0.3, width: 20, height: 20, color: 0xcccccc, armor: 0 },
         baseCost: { biomass: 10, larva: 1, dna: 0, time: 0.8 },
         growthFactors: { hp: 0.2, damage: 0.2 },
         baseLoadCapacity: 25,

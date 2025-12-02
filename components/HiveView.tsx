@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GameSaveData, UnitType, HiveSection, Polarity, GameStateSnapshot, RegionData } from '../types';
 import { UNIT_CONFIGS, METABOLISM_FACILITIES, BIO_PLUGINS, PLAYABLE_UNITS, CLICK_CONFIG } from '../constants';
 import { DataManager } from '../game/DataManager';
@@ -43,46 +43,135 @@ export const HiveView: React.FC<HiveViewProps> = ({
   const [graftingUnit, setGraftingUnit] = useState<UnitType>(UnitType.MELEE);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
 
+  // Preview State: Tracks which region to show when not actively fighting
+  const [previewRegion, setPreviewRegion] = useState<RegionData | null>(null);
+
+  // Initialize Preview Region on mount or activeRegion change
+  useEffect(() => {
+    if (activeRegion) {
+        setPreviewRegion(activeRegion);
+    } else if (!previewRegion) {
+        // Default to the highest unlocked region if nothing selected
+        const unlocked = [...mapRegions].reverse().find(r => r.isUnlocked);
+        if (unlocked) setPreviewRegion(unlocked);
+    }
+  }, [activeRegion, mapRegions]);
+
+  // Handle map selection manually to update preview
+  const handleMapSelect = (region: RegionData) => {
+      setPreviewRegion(region);
+      // If we are already fighting in a different region, we probably want to switch?
+      // For now, map click acts as 'Preview', deploy button acts as 'Fight'.
+  };
+
+  // Stable reference for Rearguard engine init to prevent re-renders
+  const onRearguardInit = useCallback(() => {}, []);
+
   const renderInvasion = () => {
+      // Determine what to show in the Frontline view
+      // Priority: Active Fight > Selected Preview > First Unlocked
+      const targetRegion = activeRegion || previewRegion;
+      const isCombatActive = activeRegion && targetRegion?.id === activeRegion.id;
+
       return (
           <div className="flex h-full w-full animate-in fade-in duration-300">
               {/* SIDEBAR (World Map) */}
-              <div className="w-1/3 min-w-[300px] border-r border-gray-800 relative z-10 bg-[#0a0a0a]">
+              <div className="w-1/3 min-w-[300px] border-r border-gray-800 relative z-10 bg-[#0a0a0a] flex flex-col">
                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10">
                        <h2 className="text-gray-500 text-xs font-bold tracking-widest uppercase">全球行动 (Global Operations)</h2>
                    </div>
-                   <WorldMapView 
-                        globalState={{...globalState, regions: mapRegions} as any} 
-                        onEnterRegion={onEnterRegion} 
-                        onOpenHive={() => {}} // No-op as we are already in hive
-                        activeRegionId={activeRegion?.id}
-                    />
+                   <div className="flex-1 relative">
+                       <WorldMapView 
+                            globalState={{...globalState, regions: mapRegions} as any} 
+                            onEnterRegion={handleMapSelect} 
+                            onOpenHive={() => {}} 
+                            activeRegionId={activeRegion?.id}
+                        />
+                   </div>
               </div>
 
-              {/* MAIN GAME VIEW */}
-              <div className="flex-1 relative bg-black">
-                    <GameCanvas 
-                        activeRegion={activeRegion}
-                        onEngineInit={onEngineInit} 
-                    />
+              {/* MAIN GAME VIEW (SPLIT SCREEN) */}
+              <div className="flex-1 flex flex-col relative bg-black border-l border-gray-800">
                     
-                    {activeRegion ? (
-                        <>
-                            <HUD gameState={gameState} onEvacuate={onEvacuate} />
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-none opacity-30">
-                                 <h1 className="text-4xl font-black text-white uppercase tracking-tighter">{activeRegion.name}</h1>
-                            </div>
-                        </>
-                    ) : (
-                        // Stockpile Overlay
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <div className="bg-black/40 backdrop-blur-sm p-6 rounded-2xl border border-gray-800/50 flex flex-col items-center">
-                                <div className="text-orange-500 text-6xl mb-4 animate-pulse opacity-80">☣️</div>
-                                <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-2">等待指令</h2>
-                                <p className="text-gray-400 text-xs tracking-wider uppercase">虫群兵力储备中... 选择冲突区域以投放</p>
+                    {/* TOP: FRONTLINE (Active Combat) - 65% Height */}
+                    <div className="relative h-[65%] w-full border-b-4 border-gray-900 overflow-hidden group">
+                        {/* Frontline Header */}
+                        <div className="absolute top-0 left-0 w-full h-8 bg-gradient-to-b from-red-900/40 to-transparent z-20 pointer-events-none flex items-center px-4 justify-between">
+                            <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${isCombatActive ? 'text-red-500 animate-pulse' : 'text-yellow-500'}`}>
+                                ● {isCombatActive ? 'FRONTLINE // 前线战场' : 'RECONNAISSANCE // 侦察模式'}
                             </div>
                         </div>
-                    )}
+
+                        {targetRegion ? (
+                            <>
+                                <GameCanvas 
+                                    activeRegion={targetRegion}
+                                    isCombat={!!isCombatActive}
+                                    onEngineInit={onEngineInit} 
+                                />
+                                
+                                {isCombatActive ? (
+                                    <HUD gameState={gameState} onEvacuate={onEvacuate} activeRegion={targetRegion} />
+                                ) : (
+                                    // RECON OVERLAY
+                                    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                                        <div className="absolute inset-0 bg-yellow-900/10 mix-blend-overlay" />
+                                        <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(0deg,transparent_50%,rgba(255,200,0,0.05)_50%)] bg-[length:100%_4px]" />
+                                        
+                                        <div className="pointer-events-auto flex flex-col items-center gap-4">
+                                            <div className="bg-black/80 backdrop-blur border border-yellow-500/50 p-6 rounded-xl flex flex-col items-center text-center shadow-[0_0_50px_rgba(234,179,8,0.2)]">
+                                                <h3 className="text-2xl font-black text-yellow-500 uppercase tracking-widest mb-1">{targetRegion.name}</h3>
+                                                <div className="text-xs text-gray-400 font-mono mb-6">
+                                                    THREAT LEVEL: {(targetRegion.difficultyMultiplier * 100).toFixed(0)}%
+                                                </div>
+                                                
+                                                <button 
+                                                    onClick={() => onEnterRegion(targetRegion)}
+                                                    className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black text-lg uppercase tracking-widest rounded shadow-[0_0_20px_rgba(220,38,38,0.6)] transition-all hover:scale-105 active:scale-95"
+                                                >
+                                                    DEPLOY SWARM
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            // Idle State (No Active Region Selected)
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505]">
+                                <div className="text-gray-700 text-6xl mb-4">📡</div>
+                                <h2 className="text-xl font-black text-gray-500 uppercase tracking-widest">等待链接</h2>
+                                <p className="text-gray-600 text-xs mt-2">请从左侧地图选择冲突区域以部署虫群</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* BOTTOM: REARGUARD (Stockpile/Base) - 35% Height */}
+                    <div className="relative flex-1 w-full bg-[#080808] overflow-hidden">
+                        {/* Rearguard Header */}
+                        <div className="absolute top-0 left-0 w-full h-6 bg-gradient-to-b from-blue-900/20 to-transparent z-20 pointer-events-none flex items-center px-4 border-t border-gray-800/50">
+                             <div className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">
+                                ● REARGUARD // 后方巢穴
+                            </div>
+                        </div>
+
+                        {/* We use a separate GameCanvas instance forced into 'Stockpile Mode' (activeRegion=null) */}
+                        {/* We don't pass onEngineInit here to avoid overwriting the main battle engine ref */}
+                        <GameCanvas 
+                            activeRegion={null} 
+                            onEngineInit={onRearguardInit} 
+                        />
+                        
+                        {/* Manual Harvest Overlay Button embedded in the Rear View */}
+                        <div className="absolute bottom-4 right-4 z-20">
+                             <button
+                                onClick={() => DataManager.instance.handleManualClick()}
+                                className="px-4 py-2 bg-gray-800/80 hover:bg-gray-700 text-gray-300 text-[10px] font-bold uppercase tracking-wider rounded border border-gray-600 backdrop-blur-sm active:scale-95 transition-all"
+                             >
+                                采集资源 (Harvest)
+                             </button>
+                        </div>
+                    </div>
               </div>
           </div>
       );

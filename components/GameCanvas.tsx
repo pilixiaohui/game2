@@ -1,14 +1,16 @@
 
+
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { GameEngine } from '../game/GameEngine';
 import { RegionData } from '../types';
 
 interface GameCanvasProps {
     activeRegion: RegionData | null;
+    isCombat?: boolean;
     onEngineInit: (engine: GameEngine) => void;
 }
 
-export const GameCanvas = forwardRef<HTMLDivElement, GameCanvasProps>(({ activeRegion, onEngineInit }, ref) => {
+export const GameCanvas = forwardRef<HTMLDivElement, GameCanvasProps>(({ activeRegion, isCombat = true, onEngineInit }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const engineRef = useRef<GameEngine | null>(null);
 
@@ -30,6 +32,7 @@ export const GameCanvas = forwardRef<HTMLDivElement, GameCanvasProps>(({ activeR
                 if (activeRegion) {
                     engine.humanDifficultyMultiplier = activeRegion.difficultyMultiplier;
                     engine.activeRegionId = activeRegion.id;
+                    engine.combatEnabled = isCombat; // Apply combat setting
                     engine.setStockpileMode(false);
                 } else {
                     // Stockpile Mode
@@ -69,7 +72,7 @@ export const GameCanvas = forwardRef<HTMLDivElement, GameCanvasProps>(({ activeR
                 while (container.firstChild) container.removeChild(container.firstChild);
             }
         };
-    }, [onEngineInit, activeRegion]); 
+    }, [onEngineInit, activeRegion, isCombat]); // Added isCombat to dependencies
 
     return <div ref={containerRef} className="absolute inset-0 w-full h-full z-0" />;
 });

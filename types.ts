@@ -386,6 +386,7 @@ export interface RegionData {
   x: number; 
   y: number; 
   difficultyMultiplier: number;
+  totalStages: number;
   spawnTable?: EnemySpawnConfig[]; 
   devourProgress: number;
   isUnlocked: boolean;
