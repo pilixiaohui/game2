@@ -1,4 +1,5 @@
 
+
 import { UnitType, UnitConfig, RegionData, GameSaveData, Faction, BioPluginConfig, Polarity, ElementType, UnitState } from './types';
 
 export const SCREEN_PADDING = 100;
@@ -119,8 +120,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
   [UnitType.MELEE]: {
     id: UnitType.MELEE,
     name: '跳虫 (Zergling)',
-    baseStats: { hp: 60, damage: 15, range: 12, speed: 180, attackSpeed: 0.4, width: 24, height: 24, color: 0x3b82f6, armor: 0 },
-    baseCost: { biomass: 15, larva: 1, dna: 0, time: 2.0 },
+    baseStats: { hp: 60, damage: 15, range: 20, speed: 180, attackSpeed: 0.4, width: 24, height: 24, color: 0x3b82f6, armor: 0 },
+    baseCost: { biomass: 15, larva: 1, dna: 0, time: 1.0 },
     growthFactors: { hp: 0.2, damage: 0.2 },
     baseLoadCapacity: 30,
     slots: [{ polarity: 'ATTACK' }, { polarity: 'DEFENSE' }, { polarity: 'ATTACK' }, { polarity: 'FUNCTION' }, { polarity: 'UNIVERSAL' }],
@@ -129,7 +130,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 4, widthPct: 1, heightPct: 1 }]
     },
     genes: [
-        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 20 } },
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
@@ -408,12 +409,12 @@ export const INITIAL_GAME_STATE: GameSaveData = {
     },
     hive: {
         unlockedUnits: {
-            [UnitType.MELEE]: { id: UnitType.MELEE, level: 1, loadout: [null, null, null, null, null], cap: 200, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
-            [UnitType.RANGED]: { id: UnitType.RANGED, level: 1, loadout: [null, null, null, null, null], cap: 50, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
-            [UnitType.PYROVORE]: { id: UnitType.PYROVORE, level: 1, loadout: [null, null, null], cap: 30, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
-            [UnitType.CRYOLISK]: { id: UnitType.CRYOLISK, level: 1, loadout: [null, null, null], cap: 30, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
-            [UnitType.OMEGALIS]: { id: UnitType.OMEGALIS, level: 1, loadout: [null, null, null, null], cap: 10, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
-            [UnitType.QUEEN]: { id: UnitType.QUEEN, level: 1, loadout: [null, null, null], cap: 5, capLevel: 1, efficiencyLevel: 1, isProducing: true, productionProgress: 0 },
+            [UnitType.MELEE]: { id: UnitType.MELEE, level: 1, loadout: [null, null, null, null, null], cap: 200, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.RANGED]: { id: UnitType.RANGED, level: 1, loadout: [null, null, null, null, null], cap: 50, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.PYROVORE]: { id: UnitType.PYROVORE, level: 1, loadout: [null, null, null], cap: 30, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.CRYOLISK]: { id: UnitType.CRYOLISK, level: 1, loadout: [null, null, null], cap: 30, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.OMEGALIS]: { id: UnitType.OMEGALIS, level: 1, loadout: [null, null, null, null], cap: 10, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
+            [UnitType.QUEEN]: { id: UnitType.QUEEN, level: 1, loadout: [null, null, null], cap: 5, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
             
             [UnitType.HUMAN_MARINE]: { id: UnitType.HUMAN_MARINE, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
             [UnitType.HUMAN_RIOT]: { id: UnitType.HUMAN_RIOT, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },

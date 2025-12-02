@@ -102,7 +102,7 @@ export class DataManager {
                         this.state.hive.unlockedUnits[u] = JSON.parse(JSON.stringify(INITIAL_GAME_STATE.hive.unlockedUnits[u] || {id:u}));
                     }
                     if (this.state.hive.unlockedUnits[u].isProducing === undefined) {
-                         this.state.hive.unlockedUnits[u].isProducing = true;
+                         this.state.hive.unlockedUnits[u].isProducing = false;
                     }
                 });
                 this.calculateOfflineProgress();

@@ -484,10 +484,15 @@ export class GameEngine implements IGameEngine {
       if (!this.unitPool || this.gracePeriodTimer > 0) return;
       const stageStart = this.currentStageIndex * STAGE_WIDTH;
       const stageEnd = (this.currentStageIndex + 1) * STAGE_WIDTH;
-      const active = this.unitPool.getActiveUnits().filter(u => !u.isDead && u.x >= stageStart && u.x <= stageEnd);
       
-      const humanCount = active.filter(u => u.faction === Faction.HUMAN).length;
-      const zergCount = active.filter(u => u.faction === Faction.ZERG).length;
+      const active = this.unitPool.getActiveUnits().filter(u => !u.isDead);
+
+      // Humans must be cleared from the CURRENT sector
+      const humanCount = active.filter(u => u.faction === Faction.HUMAN && u.x >= stageStart && u.x <= stageEnd).length;
+      
+      // Zerg count should include reinforcements coming from the previous sector (Flood logic)
+      // This prevents retreating just because the vanguard hasn't crossed the camera line yet
+      const zergCount = active.filter(u => u.faction === Faction.ZERG && u.x >= (stageStart - STAGE_WIDTH * 0.8) && u.x <= (stageEnd + 500)).length;
       
       if (humanCount === 0 && zergCount > 0 && this.currentStageIndex < 100) {
           this.advanceStage();
