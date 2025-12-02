@@ -6,12 +6,35 @@ export enum Faction {
 }
 
 export enum UnitType {
+  // --- ORIGINAL ---
   MELEE = 'MELEE',
   RANGED = 'RANGED',
   QUEEN = 'QUEEN',
   PYROVORE = 'PYROVORE', 
   CRYOLISK = 'CRYOLISK', 
   OMEGALIS = 'OMEGALIS', 
+  
+  // --- TIER 1: SWARM ---
+  ZERGLING_RAPTOR = 'ZERGLING_RAPTOR',
+  EMBER_MITE = 'EMBER_MITE',
+  SPARK_FLY = 'SPARK_FLY',
+  FROST_WEEVIL = 'FROST_WEEVIL',
+  ACID_MAGGOT = 'ACID_MAGGOT',
+
+  // --- TIER 2: SPECIALIST ---
+  LIGHTNING_SKINK = 'LIGHTNING_SKINK',
+  SPINE_HURLER = 'SPINE_HURLER',
+  MAGMA_GOLEM = 'MAGMA_GOLEM',
+  PLAGUE_BEARER = 'PLAGUE_BEARER',
+
+  // --- TIER 3: ELITE ---
+  WINTER_WITCH = 'WINTER_WITCH',
+
+  // --- TIER 4: TITAN ---
+  TYRANT_REX = 'TYRANT_REX',
+  TEMPEST_LEVIATHAN = 'TEMPEST_LEVIATHAN',
+
+  // --- HUMANS ---
   HUMAN_MARINE = 'HUMAN_MARINE',     
   HUMAN_RIOT = 'HUMAN_RIOT',         
   HUMAN_PYRO = 'HUMAN_PYRO',         
@@ -70,6 +93,7 @@ export interface VisualShapeDef {
     xOffPct?: number;   // % of unit.width offset from center
     yOffPct?: number;   // % of unit.height offset from bottom
     cornerRadius?: number;
+    rotation?: number; // Degrees
 }
 
 export interface UnitVisualConfig {
