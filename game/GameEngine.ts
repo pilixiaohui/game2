@@ -1,4 +1,5 @@
 
+
 import { Application, Container, Graphics, TilingSprite, Text, TextStyle } from 'pixi.js';
 import { Faction, GameModifiers, UnitType, GameStateSnapshot, RoguelikeCard, ElementType, StatusType, StatusEffect, IUnit, UnitRuntimeStats, GeneTrait, IGameEngine, GeneConfig } from '../types';
 import { UNIT_CONFIGS, LANE_Y, LANE_HEIGHT, DECAY_TIME, MILESTONE_DISTANCE, COLLISION_BUFFER, UNIT_SCREEN_CAPS, ELEMENT_COLORS, INITIAL_REGIONS_CONFIG, STATUS_CONFIG, STAGE_WIDTH, STAGE_TRANSITION_COOLDOWN, OBSTACLES } from '../constants';
@@ -758,6 +759,100 @@ export class GameEngine implements IGameEngine {
       const g = this.getGraphics(); g.beginFill(color, 0.5); g.drawCircle(0, 0, 10); g.endFill(); g.position.set(x, y); 
       this.activeParticles.push({ view: g, type: 'GRAPHICS', life: 0, maxLife: 20, update: (p: any, dt: number) => { p.life++; p.view.width += 8; p.view.height += 8; p.view.alpha -= 0.05; return p.view.alpha > 0; } });
   }
+  
+  // --- VFX METHODS ---
+
+  public createSlash(x: number, y: number, targetX: number, targetY: number, color: number) {
+      const g = this.getGraphics();
+      const angle = Math.atan2(targetY - y, targetX - x);
+      const len = 30;
+      
+      // Draw a "swipe" arc or line
+      g.lineStyle(2, color, 1);
+      g.moveTo(0, 0);
+      g.lineTo(len, 0);
+      
+      g.position.set(x, y);
+      g.rotation = angle;
+      
+      this.activeParticles.push({ 
+          view: g, type: 'GRAPHICS', life: 10, maxLife: 10, 
+          update: (p, dt) => { 
+              p.life -= dt * 60; 
+              p.view.alpha = p.life / 10; 
+              p.view.scale.y = 1 - (p.life/10); // Squashing effect
+              return p.life > 0; 
+          } 
+      });
+  }
+  
+  public createShockwave(x: number, y: number, radius: number, color: number) {
+      const g = this.getGraphics();
+      g.lineStyle(2, color, 0.8);
+      g.drawCircle(0, 0, radius);
+      g.position.set(x, y);
+      g.scale.set(0.1);
+      
+      this.activeParticles.push({
+          view: g, type: 'GRAPHICS', life: 15, maxLife: 15,
+          update: (p, dt) => {
+              p.life -= dt * 60;
+              const progress = 1 - (p.life / 15);
+              p.view.scale.set(progress); // Grow to full size
+              p.view.alpha = 1 - progress;
+              return p.life > 0;
+          }
+      });
+  }
+  
+  public createParticles(x: number, y: number, color: number, count: number) {
+      for(let i=0; i<count; i++) {
+          const g = this.getGraphics();
+          g.beginFill(color, 1);
+          g.drawCircle(0,0, 2);
+          g.endFill();
+          g.position.set(x, y);
+          
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 50 + Math.random() * 50;
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          
+          this.activeParticles.push({
+              view: g, type: 'GRAPHICS', life: 20 + Math.random()*10, maxLife: 30,
+              update: (p, dt) => {
+                  p.life -= dt * 60;
+                  // @ts-ignore - attaching custom velocity
+                  p.view.x += vx * dt;
+                  // @ts-ignore
+                  p.view.y += vy * dt;
+                  p.view.alpha = p.life / 30;
+                  return p.life > 0;
+              }
+          });
+      }
+  }
+  
+  public createHealEffect(x: number, y: number) {
+      let t = this.textPool.pop();
+      if (!t) { t = new Text({ text: '+', style: { fill: 0x4ade80, fontSize: 10, fontWeight: 'bold' } }); } 
+      else { t.text = '+'; t.style.fill = 0x4ade80; }
+      t.visible = true;
+      t.alpha = 1;
+      t.position.set(x, y - 10);
+      this.particleLayer.addChild(t);
+      
+      this.activeParticles.push({
+          view: t, type: 'TEXT', life: 30, maxLife: 30,
+          update: (p, dt) => {
+              p.life -= dt * 60;
+              p.view.y -= 20 * dt;
+              p.view.alpha = p.life / 30;
+              return p.life > 0;
+          }
+      });
+  }
+
   private processCorpse(u: IUnit, dt: number) {
       u.decayTimer -= dt; if (u.view) { u.view.y += 10 * dt; u.view.alpha = Math.max(0, u.decayTimer / DECAY_TIME); } if (u.decayTimer <= 0) this.unitPool!.recycle(u as Unit);
   }

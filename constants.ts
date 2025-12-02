@@ -119,7 +119,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
   [UnitType.MELEE]: {
     id: UnitType.MELEE,
     name: '跳虫 (Zergling)',
-    baseStats: { hp: 60, damage: 15, range: 30, speed: 180, attackSpeed: 0.4, width: 24, height: 24, color: 0x3b82f6, armor: 0 },
+    baseStats: { hp: 60, damage: 15, range: 12, speed: 180, attackSpeed: 0.4, width: 24, height: 24, color: 0x3b82f6, armor: 0 },
     baseCost: { biomass: 15, larva: 1, dna: 0, time: 2.0 },
     growthFactors: { hp: 0.2, damage: 0.2 },
     baseLoadCapacity: 30,
@@ -133,7 +133,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_AUTO_ATTACK', params: {} },
         { id: 'GENE_MELEE_ATTACK', params: {} },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 2.0, cohesionWeight: 0.2, alignmentWeight: 0.1 } }
+        // UPDATED: High separation force, lower cohesion
+        { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 250.0, cohesionWeight: 0.05, alignmentWeight: 0.1 } }
     ]
   },
   [UnitType.RANGED]: {
@@ -154,7 +155,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x8b5cf6 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 1.5, cohesionWeight: 0.3 } }
+        // UPDATED
+        { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 200.0, cohesionWeight: 0.05 } }
     ]
   },
   [UnitType.PYROVORE]: {
@@ -175,7 +177,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 40 } },
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        { id: 'GENE_BOIDS', params: { separationRadius: 45, separationForce: 1.0 } }
+        // UPDATED
+        { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 180.0, cohesionWeight: 0.05 } }
     ]
   },
   [UnitType.CRYOLISK]: {
@@ -197,7 +200,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_FAST_MOVEMENT', params: { multiplier: 1.3 } },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 2.5 } }
+        // UPDATED
+        { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 300.0, cohesionWeight: 0.05 } }
     ]
   },
   [UnitType.OMEGALIS]: {
@@ -223,7 +227,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_REGEN', params: { rate: 0.05 } },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        { id: 'GENE_BOIDS', params: { separationRadius: 80, separationForce: 3.0 } }
+        // UPDATED: Large separation radius for large unit
+        { id: 'GENE_BOIDS', params: { separationRadius: 70, separationForce: 400.0, cohesionWeight: 0.01 } }
     ]
   },
   [UnitType.QUEEN]: {
@@ -246,7 +251,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0xd946ef } },
         { id: 'GENE_REGEN', params: { rate: 0.1 } },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 1.0 } }
+        // UPDATED
+        { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 250.0, cohesionWeight: 0.05 } }
     ]
   },
   // Humans
@@ -262,7 +268,9 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
-          { id: 'GENE_RANGED_ATTACK', params: {} }
+          { id: 'GENE_RANGED_ATTACK', params: {} },
+          // UPDATED: Humans also need Boids to avoid stacking when spawned
+          { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 200.0, cohesionWeight: 0.0 } }
       ]
   },
   [UnitType.HUMAN_RIOT]: {
@@ -280,7 +288,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
-          { id: 'GENE_MELEE_ATTACK', params: {} }
+          { id: 'GENE_MELEE_ATTACK', params: {} },
+          { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 250.0, cohesionWeight: 0.0 } }
       ]
   },
   [UnitType.HUMAN_PYRO]: {
@@ -296,7 +305,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 10 } }, 
-          { id: 'GENE_ELEMENTAL_HIT', params: {} }
+          { id: 'GENE_ELEMENTAL_HIT', params: {} },
+          { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 200.0, cohesionWeight: 0.0 } }
       ]
   },
   [UnitType.HUMAN_SNIPER]: {
@@ -311,7 +321,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
       genes: [
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 600 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
-          { id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } }
+          { id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } },
+          { id: 'GENE_BOIDS', params: { separationRadius: 25, separationForce: 200.0, cohesionWeight: 0.0 } }
       ]
   },
   [UnitType.HUMAN_TANK]: {
@@ -330,7 +341,8 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: {} },
-          { id: 'GENE_ELEMENTAL_HIT', params: {} }
+          { id: 'GENE_ELEMENTAL_HIT', params: {} },
+          { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 400.0, cohesionWeight: 0.0 } }
       ]
   }
 };
@@ -409,7 +421,19 @@ export const INITIAL_GAME_STATE: GameSaveData = {
             [UnitType.HUMAN_SNIPER]: { id: UnitType.HUMAN_SNIPER, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
             [UnitType.HUMAN_TANK]: { id: UnitType.HUMAN_TANK, level: 1, loadout: [], cap: 0, capLevel: 1, efficiencyLevel: 1, isProducing: false, productionProgress: 0 },
         },
-        unitStockpile: {},
+        unitStockpile: {
+            [UnitType.MELEE]: 0,
+            [UnitType.RANGED]: 0,
+            [UnitType.QUEEN]: 0,
+            [UnitType.PYROVORE]: 0,
+            [UnitType.CRYOLISK]: 0,
+            [UnitType.OMEGALIS]: 0,
+            [UnitType.HUMAN_MARINE]: 0,
+            [UnitType.HUMAN_RIOT]: 0,
+            [UnitType.HUMAN_PYRO]: 0,
+            [UnitType.HUMAN_SNIPER]: 0,
+            [UnitType.HUMAN_TANK]: 0
+        },
         production: {
             larvaCapBase: INITIAL_LARVA_CAP,
             queenIntervalLevel: 1,

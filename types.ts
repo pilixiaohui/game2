@@ -1,4 +1,5 @@
 
+
 export enum Faction {
   ZERG = 'ZERG',
   HUMAN = 'HUMAN',
@@ -306,6 +307,12 @@ export interface IGameEngine {
     createProjectile: (x1: number, y1: number, x2: number, y2: number, color: number) => void;
     createFloatingText: (x: number, y: number, text: string, color: number, fontSize?: number) => void;
     createDamagePop: (x: number, y: number, value: number, element: string) => void;
+    
+    // New VFX Methods
+    createSlash: (x: number, y: number, targetX: number, targetY: number, color: number) => void;
+    createShockwave: (x: number, y: number, radius: number, color: number) => void;
+    createParticles: (x: number, y: number, color: number, count: number) => void;
+    createHealEffect: (x: number, y: number) => void;
     
     dealTrueDamage: (target: IUnit, amount: number) => void;
     killUnit: (u: IUnit) => void;

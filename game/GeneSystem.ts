@@ -1,4 +1,5 @@
 
+
 import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType, Faction } from '../types';
 import { ELEMENT_COLORS, STATUS_CONFIG, UNIT_CONFIGS } from '../constants';
 
@@ -199,6 +200,7 @@ GeneLibrary.register({
     id: 'GENE_MELEE_ATTACK',
     name: 'Melee Strike',
     onPreAttack: (self, target, engine, params) => {
+        engine.createSlash(self.x, self.y, target.x, target.y, ELEMENT_COLORS[self.stats.element] || 0xffffff);
         engine.createFlash(target.x + (Math.random() * 10 - 5), target.y - 10, ELEMENT_COLORS[self.stats.element] || 0xffffff);
         engine.processDamagePipeline(self, target);
         return false; 
@@ -211,6 +213,8 @@ GeneLibrary.register({
     onPreAttack: (self, target, engine, params) => {
         const color = params.projectileColor || ELEMENT_COLORS[self.stats.element] || 0xffffff;
         engine.createProjectile(self.x, self.y - 15, target.x, target.y - 15, color);
+        // Instant damage for responsiveness, projectile is visual
+        engine.processDamagePipeline(self, target);
         return false; 
     }
 });
@@ -221,6 +225,8 @@ GeneLibrary.register({
     onPreAttack: (self, target, engine, params) => {
         const color = params.color || ELEMENT_COLORS[self.stats.element] || 0xff7777;
         engine.createProjectile(self.x, self.y - (params.arcHeight || 20), target.x, target.y, color); 
+        // Instant damage, arc is visual
+        engine.processDamagePipeline(self, target);
         return false;
     }
 });
@@ -231,9 +237,12 @@ GeneLibrary.register({
     onPreAttack: (self, target, engine, params) => {
         const color = ELEMENT_COLORS[self.stats.element] || 0xffff00;
         engine.createFlash(target.x, target.y, color);
-        engine.processDamagePipeline(self, target);
         
         const radius = params.radius || 40;
+        engine.createShockwave(target.x, target.y, radius, color);
+        
+        engine.processDamagePipeline(self, target);
+        
         const neighbors = engine._sharedQueryBuffer;
         const count = engine.spatialHash.query(target.x, target.y, radius, neighbors);
         
@@ -253,10 +262,13 @@ GeneLibrary.register({
     onHit: (self, target, damage, engine, params) => {
         const el = self.stats.element;
         const amount = params.amount || UNIT_CONFIGS[self.type].elementConfig?.statusPerHit || 10;
+        
         if (el === 'THERMAL') engine.applyStatus(target, 'BURNING', amount, 5);
         if (el === 'CRYO') engine.applyStatus(target, 'FROZEN', amount, 5);
         if (el === 'VOLTAIC') engine.applyStatus(target, 'SHOCKED', amount, 5);
         if (el === 'TOXIN') engine.applyStatus(target, 'POISONED', amount, 5);
+        
+        engine.createParticles(target.x, target.y, ELEMENT_COLORS[el] || 0xffffff, 3);
     }
 });
 
@@ -268,6 +280,9 @@ GeneLibrary.register({
         if (self.stats.hp < self.stats.maxHp && !self.isDead) {
             self.stats.hp += self.stats.maxHp * rate * dt; 
             if (self.stats.hp > self.stats.maxHp) self.stats.hp = self.stats.maxHp;
+            
+            // Visual
+            if (Math.random() < 0.05) engine.createHealEffect(self.x, self.y);
         }
     }
 });
@@ -279,6 +294,8 @@ GeneLibrary.register({
         const radius = params.radius || 60;
         const dmg = params.damage || 40;
         engine.createExplosion(self.x, self.y, radius, ELEMENT_COLORS[self.stats.element]);
+        engine.createShockwave(self.x, self.y, radius, ELEMENT_COLORS[self.stats.element]);
+        
         const neighbors = engine._sharedQueryBuffer;
         const count = engine.spatialHash.query(self.x, self.y, radius, neighbors);
         for (let i=0; i<count; i++) {
@@ -366,7 +383,7 @@ GeneLibrary.register({
 
         if (shouldUpdate) {
             const sepRadius = params.separationRadius || 40;
-            const sepForce = params.separationForce || 1.5;
+            const sepForceConfig = params.separationForce || 1.5;
             const cohWeight = params.cohesionWeight || 0.1;
             const aliWeight = params.alignmentWeight || 0.1;
             
@@ -390,9 +407,12 @@ GeneLibrary.register({
                 
                 if (distSq < sepRadius * sepRadius && distSq > 0.001) {
                     const dist = Math.sqrt(distSq);
-                    const factor = (sepRadius - dist) / sepRadius; 
-                    forceX += (dx / dist) * factor * sepForce;
-                    forceY += (dy / dist) * factor * sepForce;
+                    // FIXED: Inverse distance repulsion to create "Hard Collision" feel
+                    // As dist -> 0, repulsion -> max.
+                    const repulsionStrength = Math.min(500, 1000 / (dist + 0.1));
+                    
+                    forceX += (dx / dist) * repulsionStrength * sepForceConfig * 0.01; // Scaled down because force config is now high (200)
+                    forceY += (dy / dist) * repulsionStrength * sepForceConfig * 0.01;
                 }
 
                 centerX += friend.x;
@@ -411,6 +431,10 @@ GeneLibrary.register({
                 }
             }
             
+            // FIXED: Random Jitter to prevent perfect stacking equilibrium
+            forceX += (Math.random() - 0.5) * 5.0;
+            forceY += (Math.random() - 0.5) * 5.0;
+
             self.steeringForce.x = forceX;
             self.steeringForce.y = forceY;
         }
