@@ -267,6 +267,8 @@ export class GameEngine implements IGameEngine {
   private humanSpawnTimer: number = 0;
   
   public cameraX: number = 0;
+  private scaleFactor: number = 1.0;
+  private userZoom: number = 1.0;
   
   public isPaused: boolean = false;
   private isDestroyed: boolean = false;
@@ -286,25 +288,59 @@ export class GameEngine implements IGameEngine {
   async init(element: HTMLElement) {
     if (this.app || this.isDestroyed) return;
     while (element.firstChild) element.removeChild(element.firstChild);
-    const app = new Application({ resizeTo: element, backgroundColor: 0x0a0a0a, antialias: true, resolution: window.devicePixelRatio || 1, autoDensity: true });
-    this.app = app;
+    
+    this.app = new Application({ 
+        resizeTo: element, 
+        backgroundColor: 0x0a0a0a, 
+        antialias: true, 
+        resolution: window.devicePixelRatio || 1, 
+        autoDensity: true 
+    });
     // @ts-ignore
     element.appendChild(this.app.view);
     
-    // Background Setup
-    const bgGfx = new Graphics(); bgGfx.beginFill(0x111111); bgGfx.drawRect(0, 0, 512, 512); bgGfx.endFill();
+    // Zoom Listener
+    // @ts-ignore
+    this.app.view.addEventListener('wheel', this.handleWheel, { passive: false });
+
+    // --- Background Setup ---
+    const bgGfx = new Graphics();
+    bgGfx.beginFill(0x111111);
+    bgGfx.drawRect(0, 0, 512, 512);
+    bgGfx.endFill();
+    // Subtle Stars/Dust
+    bgGfx.beginFill(0x333333);
+    for(let i=0; i<30; i++) {
+        bgGfx.drawCircle(Math.random() * 512, Math.random() * 512, 0.5 + Math.random());
+    }
+    bgGfx.endFill();
+    
     const bgTex = this.app.renderer.generateTexture(bgGfx);
     this.bgLayer = new TilingSprite(bgTex, this.app.screen.width, this.app.screen.height);
     this.app.stage.addChild(this.bgLayer);
 
-    const floorGfx = new Graphics(); floorGfx.beginFill(0x222222); floorGfx.drawRect(0, 0, 128, 128); floorGfx.endFill();
+    // --- Ground Setup ---
+    const floorGfx = new Graphics();
+    floorGfx.beginFill(0x181818);
+    floorGfx.drawRect(0, 0, 256, 256);
+    floorGfx.endFill();
+    
+    // Grid Pattern for Parallax Reference
+    floorGfx.lineStyle(2, 0x2a2a2a, 0.5);
+    floorGfx.moveTo(0, 0); floorGfx.lineTo(0, 256);
+    floorGfx.moveTo(0, 0); floorGfx.lineTo(256, 0);
+    // Add noise or detail
+    floorGfx.beginFill(0x222222);
+    floorGfx.drawCircle(100, 50, 5);
+    floorGfx.drawCircle(200, 180, 8);
+    floorGfx.endFill();
+
     const floorTex = this.app.renderer.generateTexture(floorGfx);
     this.groundLayer = new TilingSprite(floorTex, this.app.screen.width, this.app.screen.height / 2 + 200);
     this.groundLayer.anchor.set(0, 0);
-    this.groundLayer.y = (this.app.screen.height / 2) - 50; 
     this.app.stage.addChild(this.groundLayer);
 
-    this.world.position.set(0, this.app.screen.height / 2);
+    // --- World & Layers ---
     this.world.sortableChildren = true;
     this.app.stage.addChild(this.world);
     
@@ -318,6 +354,11 @@ export class GameEngine implements IGameEngine {
     this.world.addChild(this.unitLayer);
     this.world.addChild(this.particleLayer);
     this.unitPool = new UnitPool(1000, this.unitLayer); 
+    
+    // Resize Handler
+    this.app.renderer.on('resize', this.resize.bind(this));
+    this.resize(); // Initial Layout
+
     this.app.ticker.add(this.update.bind(this));
     
     if (this.activeRegionId > 0) {
@@ -329,8 +370,80 @@ export class GameEngine implements IGameEngine {
     }
   }
 
+  private handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    if (!this.app) return;
+
+    const zoomSpeed = 0.001;
+    const delta = -e.deltaY * zoomSpeed;
+    let newZoom = this.userZoom + delta * this.userZoom; 
+
+    // Constraints calculation
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    
+    const TARGET_LOGICAL_HEIGHT = 640;
+    const MIN_LOGICAL_WIDTH = 768;
+    let baseScale = h / TARGET_LOGICAL_HEIGHT;
+    if (w / baseScale < MIN_LOGICAL_WIDTH) {
+        baseScale = w / MIN_LOGICAL_WIDTH;
+    }
+
+    // Min Zoom: Ensure STAGE_WIDTH is fully visible if possible (Zoomed out)
+    // Scale = baseScale * userZoom
+    // VisibleWidth = w / Scale
+    // VisibleWidth <= STAGE_WIDTH  => userZoom >= w / (baseScale * STAGE_WIDTH)
+    const minZoomLimit = (w / STAGE_WIDTH) / baseScale;
+    
+    // Max Zoom: Close up, viewing approx 400px width
+    const maxZoomLimit = (w / 400) / baseScale;
+
+    // Apply clamping
+    if (newZoom < minZoomLimit) newZoom = minZoomLimit;
+    if (newZoom > maxZoomLimit) newZoom = maxZoomLimit;
+    
+    this.userZoom = newZoom;
+    this.resize();
+  }
+
+  private resize() {
+      if (!this.app || !this.bgLayer || !this.groundLayer) return;
+      const w = this.app.screen.width;
+      const h = this.app.screen.height;
+
+      // --- LOGICAL SCALING STRATEGY ---
+      // Target Logical Height: ~640px.
+      // Target Logical Width: ~768px min.
+      const TARGET_LOGICAL_HEIGHT = 640;
+      const MIN_LOGICAL_WIDTH = 768; 
+
+      let baseScale = h / TARGET_LOGICAL_HEIGHT;
+      const logicalWidth = w / baseScale;
+      if (logicalWidth < MIN_LOGICAL_WIDTH) {
+          baseScale = w / MIN_LOGICAL_WIDTH;
+      }
+      
+      // Combine with User Zoom
+      this.scaleFactor = baseScale * this.userZoom;
+      this.world.scale.set(this.scaleFactor);
+
+      // --- CENTERING ---
+      this.world.position.set(w / 2, h * 0.6);
+
+      // --- BACKGROUNDS ---
+      this.bgLayer.width = w;
+      this.bgLayer.height = h;
+      this.bgLayer.tileScale.set(this.scaleFactor);
+
+      this.groundLayer.width = w;
+      this.groundLayer.height = h; 
+      this.groundLayer.tileScale.set(this.scaleFactor);
+      this.groundLayer.y = this.world.y; 
+  }
+
   public setStockpileMode(enabled: boolean) {
       this.isStockpileMode = enabled;
+      this.userZoom = 1.0; // Reset zoom on mode switch
       
       // v2.3 Dynamic Gene Swapping for Mode Switch
       if (this.unitPool) {
@@ -345,7 +458,7 @@ export class GameEngine implements IGameEngine {
 
       if (enabled) {
           this.cameraX = 0;
-          if (this.world) this.world.position.x = 0;
+          this.world.pivot.x = 0; 
           this.clearParticles();
       } else {
           const saved = DataManager.instance.state.world.regions[this.activeRegionId];
@@ -354,6 +467,7 @@ export class GameEngine implements IGameEngine {
           this.populateBattlefield();
           this.gracePeriodTimer = 2.0;
       }
+      this.resize();
   }
   
   public spawnUnit(faction: Faction, type: UnitType, x: number): IUnit | null {
@@ -437,7 +551,8 @@ export class GameEngine implements IGameEngine {
 
     if (this.isStockpileMode) {
         this.updateStockpileVisualization(dt);
-        this.world.position.x = 0;
+        if (this.bgLayer) this.bgLayer.tilePosition.x -= 0.2; 
+        if (this.groundLayer) this.groundLayer.tilePosition.x -= 0.5;
     } else {
         this.updateBattleMode(dt);
     }
@@ -471,11 +586,19 @@ export class GameEngine implements IGameEngine {
 
   private updateBattleMode(dt: number) {
       if (this.gracePeriodTimer > 0) this.gracePeriodTimer -= dt;
-      const targetCamX = (this.currentStageIndex * STAGE_WIDTH) + (STAGE_WIDTH / 2) - (this.app!.screen.width / 2);
+      
+      // Camera Smoothing
+      const targetCamX = (this.currentStageIndex * STAGE_WIDTH) + (STAGE_WIDTH / 2);
       this.cameraX += (targetCamX - this.cameraX) * 0.05;
       
-      this.world.position.x = -this.cameraX; 
+      // Update Camera Pivot (The center of the screen looks at this world point)
+      this.world.pivot.x = this.cameraX;
+      
+      // Parallax Scrolling
+      // Since tileScale matches scaleFactor, 1 texture px = 1 world unit = scaleFactor screen px.
+      // We offset by world units directly.
       if (this.bgLayer) this.bgLayer.tilePosition.x = -this.cameraX * 0.1;
+      if (this.groundLayer) this.groundLayer.tilePosition.x = -this.cameraX;
       
       this.handleDeployment(dt);
       this.handleHumanSpawning(dt);
@@ -512,7 +635,7 @@ export class GameEngine implements IGameEngine {
       this.currentStageIndex++;
       this.stageTransitionTimer = STAGE_TRANSITION_COOLDOWN;
       this.gracePeriodTimer = 1.0;
-      this.createFloatingText(this.cameraX + this.app!.screen.width/2, LANE_Y - 100, "SECTOR CLEARED", 0x4ade80, 32);
+      this.createFloatingText(this.cameraX, LANE_Y - 100, "SECTOR CLEARED", 0x4ade80, 32);
       if (this.activeRegionId) DataManager.instance.updateRegionProgress(this.activeRegionId, 1);
       this.spawnHumanWaveInStage(this.currentStageIndex + 1);
   }
@@ -521,7 +644,7 @@ export class GameEngine implements IGameEngine {
       this.currentStageIndex--;
       this.stageTransitionTimer = STAGE_TRANSITION_COOLDOWN;
       this.gracePeriodTimer = 1.0; 
-      this.createFloatingText(this.cameraX + this.app!.screen.width/2, LANE_Y - 100, "FALLBACK!", 0xf87171, 32);
+      this.createFloatingText(this.cameraX, LANE_Y - 100, "FALLBACK!", 0xf87171, 32);
       if (this.activeRegionId) DataManager.instance.updateRegionProgress(this.activeRegionId, -1);
       this.spawnHumanWaveInStage(this.currentStageIndex);
   }
@@ -570,13 +693,20 @@ export class GameEngine implements IGameEngine {
   private updateStockpileVisualization(dt: number) {
       const stockpile = DataManager.instance.state.hive.unitStockpile;
       const activeVisuals = this.unitPool!.getActiveUnits().filter(u => u.faction === Faction.ZERG);
+      
+      // Calculate logical view width based on current scale
+      const logicalWidth = this.app!.screen.width / this.scaleFactor;
+      
       Object.values(UnitType).forEach(type => {
           if (type.startsWith('HUMAN')) return;
           const storedCount = stockpile[type] || 0;
           const targetVisualCount = Math.min(storedCount, UNIT_SCREEN_CAPS[type] || 10);
           const currentVisuals = activeVisuals.filter(u => u.type === type);
           if (currentVisuals.length < targetVisualCount) {
-             const u = this.unitPool!.spawn(Faction.ZERG, type, Math.random() * this.app!.screen.width, this.modifiers);
+             // Spawn within the visible area centered at 0
+             const range = logicalWidth * 0.8;
+             const x = (Math.random() - 0.5) * range;
+             const u = this.unitPool!.spawn(Faction.ZERG, type, x, this.modifiers);
              // v2.3 Apply Stockpile AI immediately
              if (u) this.applyStockpileAI(u);
           } else if (currentVisuals.length > targetVisualCount) {
@@ -787,7 +917,10 @@ export class GameEngine implements IGameEngine {
       let t = this.textPool.pop();
       if (!t) { t = new Text({ text, style: { fontFamily: 'Courier New', fontSize, fontWeight: 'bold', fill: color } }); } 
       else { t.text = text; t.style.fill = color; }
-      t.visible = true; t.alpha = 1; t.position.set(x, y); this.particleLayer.addChild(t);
+      t.visible = true;
+      t.alpha = 1;
+      t.position.set(x, y);
+      this.particleLayer.addChild(t);
       this.activeParticles.push({ view: t, type: 'TEXT', life: 60, maxLife: 60, update: (p, dt) => { p.life -= dt * 60; p.view.y -= 0.5; p.view.alpha = p.life / 20; return p.life > 0; } });
   }
   public createFlash(x: number, y: number, color: number) { 
@@ -929,6 +1062,12 @@ export class GameEngine implements IGameEngine {
   public pause() { this.isPaused = true; }
   public destroy() { 
       this.isDestroyed = true;
+      // Cleanup listener
+      if (this.app && this.app.view) {
+          // @ts-ignore
+          this.app.view.removeEventListener('wheel', this.handleWheel);
+      }
+      
       if (!this.isStockpileMode && this.unitPool) {
           const activeZerg = this.unitPool.getActiveUnits().filter(u => u.faction === Faction.ZERG && !u.isDead);
           activeZerg.forEach(u => DataManager.instance.addToStockpile(u.type, 1));

@@ -20,6 +20,13 @@ export enum UnitType {
   SPARK_FLY = 'SPARK_FLY',
   FROST_WEEVIL = 'FROST_WEEVIL',
   ACID_MAGGOT = 'ACID_MAGGOT',
+  
+  // New T1
+  BONE_BLADE = 'BONE_BLADE',
+  ACID_SPITTER = 'ACID_SPITTER',
+  STATIC_ORB = 'STATIC_ORB',
+  CINDER_LING = 'CINDER_LING',
+  FROST_SHARD = 'FROST_SHARD',
 
   // --- TIER 2: SPECIALIST ---
   LIGHTNING_SKINK = 'LIGHTNING_SKINK',
@@ -27,19 +34,83 @@ export enum UnitType {
   MAGMA_GOLEM = 'MAGMA_GOLEM',
   PLAGUE_BEARER = 'PLAGUE_BEARER',
 
+  // New T2
+  SIEGE_BEETLE = 'SIEGE_BEETLE',
+  FROST_WARD = 'FROST_WARD',
+  MAGMA_SPRAYER = 'MAGMA_SPRAYER',
+  SHOCK_ROACH = 'SHOCK_ROACH',
+  VILE_CRAWLER = 'VILE_CRAWLER',
+
   // --- TIER 3: ELITE ---
   WINTER_WITCH = 'WINTER_WITCH',
+
+  // New T3
+  PULSE_BEAST = 'PULSE_BEAST',
+  CORRUPTOR = 'CORRUPTOR',
+  PHANTOM_ASSASSIN = 'PHANTOM_ASSASSIN',
+  INFERNO_JUDGE = 'INFERNO_JUDGE',
+  CRYSTAL_WEAVER = 'CRYSTAL_WEAVER',
 
   // --- TIER 4: TITAN ---
   TYRANT_REX = 'TYRANT_REX',
   TEMPEST_LEVIATHAN = 'TEMPEST_LEVIATHAN',
 
-  // --- HUMANS ---
-  HUMAN_MARINE = 'HUMAN_MARINE',     
-  HUMAN_RIOT = 'HUMAN_RIOT',         
-  HUMAN_PYRO = 'HUMAN_PYRO',         
-  HUMAN_SNIPER = 'HUMAN_SNIPER',     
-  HUMAN_TANK = 'HUMAN_TANK',         
+  // New T4
+  STAR_EATER = 'STAR_EATER',
+  ETERNAL_GLACIER = 'ETERNAL_GLACIER',
+  STORM_BRINGER = 'STORM_BRINGER',
+  ABYSSAL_MAW = 'ABYSSAL_MAW',
+  PESTILENCE_LORD = 'PESTILENCE_LORD',
+
+  // --- HUMAN TIER 1: INFANTRY & SECURITY (轻步兵) ---
+  HUMAN_MARINE = 'HUMAN_MARINE',         // [Existing] 基础步枪兵
+  HUMAN_MILITIA = 'HUMAN_MILITIA',       // 民兵 (炮灰)
+  HUMAN_K9_UNIT = 'HUMAN_K9_UNIT',       // 军犬 (快速近战)
+  HUMAN_SCOUT = 'HUMAN_SCOUT',           // 侦察兵 (高移速)
+  HUMAN_MEDIC = 'HUMAN_MEDIC',           // 战地医生 (治疗光环)
+  HUMAN_ENGINEER = 'HUMAN_ENGINEER',     // 工程师 (亡语造塔)
+  HUMAN_RIOT = 'HUMAN_RIOT',             // [Existing] 防暴盾卫 (物理肉盾)
+  HUMAN_RECON_DRONE = 'HUMAN_RECON_DRONE', // 侦查无人机 (飞行)
+
+  // --- HUMAN TIER 2: SPECIAL FORCES (特种兵) ---
+  HUMAN_PYRO = 'HUMAN_PYRO',             // [Existing] 火焰兵 (AOE)
+  HUMAN_SNIPER = 'HUMAN_SNIPER',         // [Existing] 狙击手 (斩杀)
+  HUMAN_GRENADIER = 'HUMAN_GRENADIER',   // 掷弹兵 (曲射AOE)
+  HUMAN_SHOCK_TROOPER = 'HUMAN_SHOCK_TROOPER', // 磁暴步兵 (连锁闪电)
+  HUMAN_CRYO_TROOPER = 'HUMAN_CRYO_TROOPER',   // 冷冻兵 (减速)
+  HUMAN_CHEM_TROOPER = 'HUMAN_CHEM_TROOPER',   // 化学兵 (毒素)
+  HUMAN_ROCKET_TROOPER = 'HUMAN_ROCKET_TROOPER', // 火箭兵 (破甲)
+  HUMAN_GHOST = 'HUMAN_GHOST',           // 幽灵特工 (隐形/核弹引导)
+
+  // --- HUMAN TIER 3: LIGHT VEHICLES (轻载具) ---
+  HUMAN_ASSAULT_BIKE = 'HUMAN_ASSAULT_BIKE', // 突击摩托 (游击)
+  HUMAN_TECHNICAL = 'HUMAN_TECHNICAL',       // 武装皮卡 (机枪)
+  HUMAN_APC = 'HUMAN_APC',               // 装甲运兵车 (亡语出兵)
+  HUMAN_VULTURE = 'HUMAN_VULTURE',       // 秃鹫战车 (地雷)
+  HUMAN_FLAME_TANK = 'HUMAN_FLAME_TANK', // 喷火坦克
+  HUMAN_TESLA_TANK = 'HUMAN_TESLA_TANK', // 磁暴坦克
+
+  // --- HUMAN TIER 4: HEAVY ARMOR (重装甲) ---
+  HUMAN_TANK = 'HUMAN_TANK',             // [Existing] 主战坦克
+  HUMAN_SIEGE_TANK = 'HUMAN_SIEGE_TANK', // 攻城坦克 (超远AOE)
+  HUMAN_GOLIATH = 'HUMAN_GOLIATH',       // 歌利亚机甲 (对空/对地)
+  HUMAN_RAILGUN_MECH = 'HUMAN_RAILGUN_MECH', // 磁轨炮机甲 (穿透)
+  HUMAN_TITAN_WALKER = 'HUMAN_TITAN_WALKER', // 泰坦行进者 (Boss级)
+  
+  // --- HUMAN TIER 5: AIRFORCE (空军) ---
+  HUMAN_HELICOPTER = 'HUMAN_HELICOPTER', // 武装直升机
+  HUMAN_FIGHTER_JET = 'HUMAN_FIGHTER_JET', // 喷气战机 (极快)
+  HUMAN_BOMBER = 'HUMAN_BOMBER',         // 轰炸机 (地毯式轰炸)
+  HUMAN_GUNSHIP = 'HUMAN_GUNSHIP',       // 炮艇机 (盘旋输出)
+  HUMAN_BATTLECRUISER = 'HUMAN_BATTLECRUISER', // 战列巡洋舰 (激光)
+
+  // --- HUMAN STATIC DEFENSE (防御塔 - Speed 0) ---
+  HUMAN_BUNKER = 'HUMAN_BUNKER',         // 碉堡 (高血量)
+  HUMAN_TURRET_MG = 'HUMAN_TURRET_MG',   // 机枪塔
+  HUMAN_TURRET_CANNON = 'HUMAN_TURRET_CANNON', // 加农炮塔
+  HUMAN_TURRET_MISSILE = 'HUMAN_TURRET_MISSILE', // 导弹塔 (对空/热能)
+  HUMAN_TURRET_LASER = 'HUMAN_TURRET_LASER',   // 激光塔 (单体高伤)
+  HUMAN_TESLA_COIL = 'HUMAN_TESLA_COIL',       // 磁暴线圈 (防御塔)
 }
 
 export enum HiveSection {
@@ -75,7 +146,6 @@ export interface StatusEffect {
 
 export type Polarity = 'ATTACK' | 'DEFENSE' | 'FUNCTION' | 'UNIVERSAL';
 
-// v2.0: Parameterized Gene Config
 export interface GeneConfig {
     id: string;
     params?: Record<string, any>;
@@ -85,15 +155,15 @@ export type VisualShapeType = 'CIRCLE' | 'RECT' | 'ROUNDED_RECT' | 'MODEL_QUEEN'
 
 export interface VisualShapeDef {
     type: VisualShapeType;
-    color?: number;     // Override unit color
-    colorDarken?: number; // Multiplier to darken (0-1)
-    widthPct?: number;  // % of unit.width (1.0 = 100%)
-    heightPct?: number; // % of unit.height
-    radiusPct?: number; // % of unit.width
-    xOffPct?: number;   // % of unit.width offset from center
-    yOffPct?: number;   // % of unit.height offset from bottom
+    color?: number;     
+    colorDarken?: number; 
+    widthPct?: number;  
+    heightPct?: number; 
+    radiusPct?: number; 
+    xOffPct?: number;   
+    yOffPct?: number;   
     cornerRadius?: number;
-    rotation?: number; // Degrees
+    rotation?: number; 
 }
 
 export interface UnitVisualConfig {
@@ -134,7 +204,7 @@ export interface UnitConfig {
         statusPerHit?: number;
     };
     genes?: GeneConfig[];
-    visual?: UnitVisualConfig; // v2.1: Data-driven visuals
+    visual?: UnitVisualConfig;
     tags?: string[];
 }
 
@@ -241,7 +311,7 @@ export interface PlayerProfile {
     lastSaveTime: number;
     prestigeLevel: number;
     totalKills?: number;
-    lifetimeDna?: number; // For Prestige calculation
+    lifetimeDna?: number;
     mutationUpgrades?: {
         metabolicSurge: number;
         larvaFission: number;
@@ -322,25 +392,19 @@ export interface RegionData {
   isFighting: boolean;
 }
 
-// --- v2.0 GENE & ENGINE SYSTEM INTERFACES ---
-
 export interface IGameEngine {
-    // Systems
     spatialHash: {
         query: (x: number, y: number, radius: number, out: IUnit[]) => number;
     };
-    // Utils
     _sharedQueryBuffer: IUnit[]; 
-    isStockpileMode: boolean; // Exposed for Genes
+    isStockpileMode: boolean;
     
-    // Actions
     createExplosion: (x: number, y: number, radius: number, color?: number) => void;
     createFlash: (x: number, y: number, color: number) => void;
     createProjectile: (x1: number, y1: number, x2: number, y2: number, color: number) => void;
     createFloatingText: (x: number, y: number, text: string, color: number, fontSize?: number) => void;
     createDamagePop: (x: number, y: number, value: number, element: string) => void;
     
-    // New VFX Methods
     createSlash: (x: number, y: number, targetX: number, targetY: number, color: number) => void;
     createShockwave: (x: number, y: number, radius: number, color: number) => void;
     createParticles: (x: number, y: number, color: number, count: number) => void;
@@ -352,31 +416,19 @@ export interface IGameEngine {
     processDamagePipeline: (source: IUnit, target: IUnit) => void;
     performAttack: (source: IUnit, target: IUnit) => void;
     
-    // New: Unit Spawning Hook
     spawnUnit: (faction: Faction, type: UnitType, x: number) => IUnit | null;
 }
 
 export interface GeneTrait {
     id: string;
     name: string;
-    
-    // Lifecycle Hooks
     onTick?: (self: IUnit, dt: number, engine: IGameEngine, params: any) => void;
-    
-    // Movement Logic
     onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine, params: any) => void; 
-    
-    // Targeting Logic
     onUpdateTarget?: (self: IUnit, dt: number, engine: IGameEngine, params: any) => void;
-    
-    // Combat Hooks
     onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine, params: any) => boolean; 
     onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine, params: any) => void;
     onDeath?: (self: IUnit, engine: IGameEngine, params: any) => void;
-
-    // [New] Defensive Hook: Allows modification of incoming damage
     onWasHit?: (self: IUnit, attacker: IUnit, damage: number, engine: IGameEngine, params: any) => number;
-    // [New] Kill Hook: Triggered when self kills a victim
     onKill?: (self: IUnit, victim: IUnit, engine: IGameEngine, params: any) => void;
 }
 
@@ -389,32 +441,21 @@ export interface IUnit {
     x: number;
     y: number;
     radius: number;
-    
-    // Compositional Stats
     stats: UnitRuntimeStats;
-    // Runtime Context
     statuses: Partial<Record<StatusType, StatusEffect>>;
-    context: Record<string, any>; // v2.1: Data Blackboard for Genes
+    context: Record<string, any>;
     attackCooldown: number;
     target: IUnit | null;
     flashTimer: number;
-    
-    // Runtime Fields
     decayTimer: number;
     wanderTimer: number;
     wanderDir: number;
     engagedCount: number;
     speedVar: number;
     waveOffset: number;
-    
-    // Optimization & Physics Fields (v2.0)
     frameOffset: number; 
-    steeringForce: { x: number, y: number }; // Sample-and-Hold force for Boids
-    
-    // System
+    steeringForce: { x: number, y: number };
     view: any; 
     geneConfig: GeneConfig[];
-    
-    // State
     state: string;
 }
