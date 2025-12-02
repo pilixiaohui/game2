@@ -76,24 +76,29 @@ export const OBSTACLES = [
 ];
 
 export const METABOLISM_FACILITIES = {
-    VILLI: { NAME: "菌毯绒毛 (Villi)", DESC: "基础吸收。每100个提供 x1.25 全局乘区。", BASE_COST: 15, GROWTH: 1.15, BASE_RATE: 1.0, CLUSTER_THRESHOLD: 100, COST_RESOURCE: 'biomass' },
-    TAPROOT: { NAME: "深钻根须 (Taproot)", DESC: "深层供养。使绒毛基础产出 +0.1。", BASE_COST: 500, GROWTH: 1.25, BASE_RATE: 0, BONUS_TO_VILLI: 0.1, COST_RESOURCE: 'biomass' },
-    GEYSER: { NAME: "酸蚀喷泉 (Acid Geyser)", DESC: "工业基石。提供稳定的生物质流。", BASE_COST: 12000, GROWTH: 1.15, BASE_RATE: 85.0, COST_RESOURCE: 'biomass' },
-    BREAKER: { NAME: "地壳破碎机 (Crust Breaker)", DESC: "过载开采。产出极高，每秒流失 0.05% 库存。", BASE_COST: 150000, GROWTH: 1.30, BASE_RATE: 3500.0, LOSS_RATE: 0.0005, COST_RESOURCE: 'biomass' },
+    // TIER I: Matter (Low Growth to encourage stacking 1.15 - 1.30)
+    VILLI: { NAME: "菌毯绒毛 (Villi)", DESC: "基础吸收。每100个提供 x1.25 全局乘区。", BASE_COST: 15, GROWTH: 1.08, BASE_RATE: 1.0, CLUSTER_THRESHOLD: 100, COST_RESOURCE: 'biomass' },
+    TAPROOT: { NAME: "深钻根须 (Taproot)", DESC: "深层供养。使绒毛基础产出 +0.1。", BASE_COST: 500, GROWTH: 1.10, BASE_RATE: 0, BONUS_TO_VILLI: 0.1, COST_RESOURCE: 'biomass' },
+    GEYSER: { NAME: "酸蚀喷泉 (Acid Geyser)", DESC: "工业基石。提供稳定的生物质流。", BASE_COST: 12000, GROWTH: 1.12, BASE_RATE: 85.0, COST_RESOURCE: 'biomass' },
+    BREAKER: { NAME: "地壳破碎机 (Crust Breaker)", DESC: "过载开采。产出极高，每秒流失 0.05% 库存。", BASE_COST: 150000, GROWTH: 1.15, BASE_RATE: 3500.0, LOSS_RATE: 0.0005, COST_RESOURCE: 'biomass' },
     
+    // TIER II: Energy (Standard Growth 1.15)
     SAC: { NAME: "发酵囊 (Fermentation Sac)", DESC: "基础转化：100 Bio -> 1 Enz。", BASE_COST: 10000, GROWTH: 1.15, INPUT: 100, OUTPUT: 1, COST_RESOURCE: 'biomass' },
     PUMP: { NAME: "回流泵 (Reflux Pump)", DESC: "效率优化：减少发酵囊 2 消耗 (Min 50)。", BASE_COST: 2500, GROWTH: 1.25, COST_REDUCTION: 2, MIN_COST: 50, COST_RESOURCE: 'enzymes' },
     CRACKER: { NAME: "热能裂解堆 (Thermal Cracker)", DESC: "高压裂变：500 Bio -> 15 Enz (产生热量)。", BASE_COST: 25000, GROWTH: 1.20, INPUT: 500, OUTPUT: 15, HEAT_GEN: 5, COOL_RATE: 8, COST_RESOURCE: 'enzymes' },
     BOILER: { NAME: "血肉锅炉 (Flesh Boiler)", DESC: "回收利用：1 幼虫 -> 500 Enz。", BASE_COST: 100000, GROWTH: 1.30, INPUT_LARVA: 1, OUTPUT_ENZ: 500, COST_RESOURCE: 'enzymes' },
     
+    // TIER I EXOTIC (High Growth)
     NECRO_SIPHON: { NAME: "尸骸转化冢 (Necro Siphon)", DESC: "战争红利。产出 = 基础值 + 累计击杀数 * 10。", BASE_COST: 1500000, GROWTH: 1.40, BASE_RATE: 500.0, KILL_SCALAR: 10.0, COST_RESOURCE: 'biomass' },
     RED_TIDE: { NAME: "红潮藻井 (Red Tide Silo)", DESC: "生态协同。产出 = 基础值 * (1 + 绒毛数量/50)。", BASE_COST: 50000000, GROWTH: 1.60, BASE_RATE: 15000.0, COST_RESOURCE: 'biomass' },
     GAIA_DIGESTER: { NAME: "盖亚消化池 (Gaia Digester)", DESC: "星球吞噬。产出 = 50 * (当前库存)^0.8。", BASE_COST: 5000000000, GROWTH: 2.00, POW_FACTOR: 0.8, COEFF: 50.0, COST_RESOURCE: 'biomass' },
     
+    // TIER II EXOTIC
     BLOOD_FUSION: { NAME: "鲜血聚变堆 (Blood Fusion)", DESC: "内循环。每秒吞噬 1 只近战兵种 -> 转化 2000 Enz。", BASE_COST: 500000, GROWTH: 1.50, INPUT_UNIT: 'MELEE', OUTPUT_ENZ: 2000, COST_RESOURCE: 'enzymes' },
     RESONATOR: { NAME: "突触谐振塔 (Synaptic Resonator)", DESC: "大数定律。产出 = √总人口 * 500。", BASE_COST: 10000000, GROWTH: 1.45, POP_SCALAR: 500, COST_RESOURCE: 'enzymes' },
     ENTROPY_VENT: { NAME: "熵增排放口 (Entropy Vent)", DESC: "双曲贴现。每秒燃烧 1% Bio库存 -> 5x 等价 Enz。", BASE_COST: 1000000000, GROWTH: 2.50, BURN_RATE: 0.01, CONVERT_RATIO: 5.0, COST_RESOURCE: 'enzymes' },
 
+    // TIER III: Data (High Growth 1.25+)
     SPIRE: { NAME: "神经尖塔 (Neural Spire)", DESC: "基础解析：产生微量 DNA (0.005/s)。", BASE_COST: 5000, GROWTH: 1.25, BASE_RATE: 0.005, COST_RESOURCE: 'enzymes' },
     HIVE_MIND: { NAME: "虫群意识网 (Hive Mind)", DESC: "思维共鸣：产出 = 0.001 * √总兵力。", BASE_COST: 50000, GROWTH: 1.40, SCALAR: 0.001, COST_RESOURCE: 'enzymes' },
     RECORDER: { NAME: "阿卡西记录 (Akashic Recorder)", DESC: "概率跃迁：15% 概率复制 1% DNA。", BASE_COST: 250000, GROWTH: 1.50, CHANCE: 0.15, PERCENT: 0.01, COST_RESOURCE: 'enzymes' },
@@ -117,6 +122,8 @@ export const PLAYABLE_UNITS = [
 ];
 
 export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
+  // 1. 狂暴跳虫 (Zergling - Adrenaline)
+  // 核心：吸血 + 冲锋 + 杀戮盛宴
   [UnitType.MELEE]: {
     id: UnitType.MELEE,
     name: '跳虫 (Zergling)',
@@ -130,14 +137,18 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 4, widthPct: 1, heightPct: 1 }]
     },
     genes: [
-        { id: 'GENE_ACQUIRE_TARGET', params: { range: 20 } },
-        { id: 'GENE_AUTO_ATTACK', params: {} },
-        { id: 'GENE_MELEE_ATTACK', params: {} },
-        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        // UPDATED: High separation force, lower cohesion
-        { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 250.0, cohesionWeight: 0.05, alignmentWeight: 0.1 } }
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 300 } },
+        { id: 'GENE_COMBAT_MOVEMENT' },
+        { id: 'GENE_AUTO_ATTACK' },
+        { id: 'GENE_MELEE_ATTACK' },
+        { id: 'GENE_VAMPIRIC', params: { ratio: 0.15 } },      // [New] Sustain
+        { id: 'GENE_DASH_CHARGE', params: { speedMult: 2.5 } }, // [New] Engage
+        { id: 'GENE_RAMPAGE', params: { heal: 0.1 } },          // [New] Snowball
+        { id: 'GENE_BOIDS', params: { separationRadius: 25, separationForce: 250.0, cohesionWeight: 0.05 } }
     ]
   },
+  // 2. 剧毒刺蛇 (Hydralisk - Toxin)
+  // 核心：远程 + 毒伤 + 斩杀
   [UnitType.RANGED]: {
     id: UnitType.RANGED,
     name: '刺蛇 (Hydralisk)',
@@ -152,18 +163,20 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     },
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
-        { id: 'GENE_AUTO_ATTACK', params: {} },
-        { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x8b5cf6 } },
-        { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        // UPDATED
+        { id: 'GENE_COMBAT_MOVEMENT' },
+        { id: 'GENE_AUTO_ATTACK' },
+        { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0x00ff00 } },
+        { id: 'GENE_POISON_TOUCH', params: { stacks: 2 } },
+        { id: 'GENE_EXECUTE', params: { threshold: 0.2, multiplier: 3.0 } }, // [New] Sniper Logic
         { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 200.0, cohesionWeight: 0.05 } }
     ]
   },
+  // 4. 爆蚊 (Scourge - Suicide) (Using PYROVORE slot)
+  // 核心：飞行 + 自爆 + 极快速度
   [UnitType.PYROVORE]: {
     id: UnitType.PYROVORE,
-    name: '爆裂虫 (Pyrovore)',
-    baseStats: { hp: 120, damage: 45, range: 280, speed: 90, attackSpeed: 0.8, width: 28, height: 28, color: 0xf87171, armor: 5 },
+    name: '爆裂虫 (Scourge)',
+    baseStats: { hp: 60, damage: 50, range: 280, speed: 250, attackSpeed: 0.8, width: 28, height: 28, color: 0xf87171, armor: 0 },
     baseCost: { biomass: 60, larva: 1, dna: 0, time: 5.0 },
     growthFactors: { hp: 0.15, damage: 0.3 },
     baseLoadCapacity: 40,
@@ -173,13 +186,11 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         shapes: [{ type: 'ROUNDED_RECT', cornerRadius: 8, widthPct: 1, heightPct: 1 }]
     },
     genes: [
-        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
-        { id: 'GENE_AUTO_ATTACK', params: {} },
-        { id: 'GENE_ARTILLERY_ATTACK', params: { arcHeight: 40 } },
-        { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        // UPDATED
-        { id: 'GENE_BOIDS', params: { separationRadius: 40, separationForce: 180.0, cohesionWeight: 0.05 } }
+        { id: 'GENE_ACQUIRE_TARGET', params: { range: 800 } },
+        { id: 'GENE_COMBAT_MOVEMENT', params: { speedMult: 2.0, multiplier: 1.5 } },
+        { id: 'GENE_GHOST_WALK' },
+        { id: 'GENE_SELF_DESTRUCT' }, // [New] Trigger
+        { id: 'GENE_EXPLODE_ON_DEATH', params: { radius: 120, damage: 150 } } // [Modified] Big Boom
     ]
   },
   [UnitType.CRYOLISK]: {
@@ -201,14 +212,15 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         { id: 'GENE_ELEMENTAL_HIT', params: {} },
         { id: 'GENE_FAST_MOVEMENT', params: { multiplier: 1.3 } },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        // UPDATED
         { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 300.0, cohesionWeight: 0.05 } }
     ]
   },
+  // 3. 雷兽 (Ultralisk - Tank)
+  // 核心：顺劈 + 反伤 + 硬化皮肤 + 击晕
   [UnitType.OMEGALIS]: {
     id: UnitType.OMEGALIS,
-    name: '雷兽 (Omegalis)',
-    baseStats: { hp: 800, damage: 30, range: 50, speed: 70, attackSpeed: 0.6, width: 45, height: 45, color: 0xfacc15, armor: 60 },
+    name: '雷兽 (Ultralisk)',
+    baseStats: { hp: 1200, damage: 45, range: 50, speed: 60, attackSpeed: 0.6, width: 50, height: 50, color: 0xfacc15, armor: 80 },
     baseCost: { biomass: 300, larva: 2, dna: 10, time: 15.0 }, 
     growthFactors: { hp: 0.4, damage: 0.1 },
     baseLoadCapacity: 80,
@@ -224,18 +236,20 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
     genes: [
         { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
         { id: 'GENE_AUTO_ATTACK', params: {} },
-        { id: 'GENE_CLEAVE_ATTACK', params: { radius: 60, percentage: 0.5 } },
-        { id: 'GENE_ELEMENTAL_HIT', params: {} },
-        { id: 'GENE_REGEN', params: { rate: 0.05 } },
+        { id: 'GENE_CLEAVE_ATTACK', params: { radius: 80 } },
+        { id: 'GENE_THORNS', params: { ratio: 0.5 } },          // [New] Reflect
+        { id: 'GENE_HARDENED_SKIN', params: { amount: 15 } },   // [New] Flat Reduction
+        { id: 'GENE_STUN_HIT', params: { chance: 0.2 } },
         { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        // UPDATED: Large separation radius for large unit
         { id: 'GENE_BOIDS', params: { separationRadius: 70, separationForce: 400.0, cohesionWeight: 0.01 } }
     ]
   },
+  // 5. 感染者 (Infestor - Support) (Using QUEEN slot)
+  // 核心：亡语召唤 + 指挥光环 + 潜地回血
   [UnitType.QUEEN]: {
     id: UnitType.QUEEN,
-    name: '虫后 (Queen)',
-    baseStats: { hp: 300, damage: 10, range: 100, speed: 50, attackSpeed: 1.0, width: 32, height: 48, color: 0xd946ef, armor: 20 },
+    name: '感染者 (Infestor)',
+    baseStats: { hp: 250, damage: 10, range: 100, speed: 40, attackSpeed: 1.0, width: 32, height: 48, color: 0xd946ef, armor: 20 },
     baseCost: { biomass: 150, larva: 1, dna: 0, time: 10.0 }, 
     growthFactors: { hp: 0.1, damage: 0.1 },
     baseLoadCapacity: 50,
@@ -247,12 +261,11 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
         ]
     },
     genes: [
-        { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
-        { id: 'GENE_AUTO_ATTACK', params: {} },
-        { id: 'GENE_RANGED_ATTACK', params: { projectileColor: 0xd946ef } },
-        { id: 'GENE_REGEN', params: { rate: 0.1 } },
-        { id: 'GENE_COMBAT_MOVEMENT', params: {} },
-        // UPDATED
+        { id: 'GENE_ACQUIRE_TARGET' },
+        { id: 'GENE_WANDER' }, 
+        { id: 'GENE_BURROW_HEAL' },
+        { id: 'GENE_COMMAND_AURA', params: { range: 300 } },
+        { id: 'GENE_SPAWN_BROOD', params: { count: 3 } },
         { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 250.0, cohesionWeight: 0.05 } }
     ]
   },
@@ -270,7 +283,6 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: {} },
-          // UPDATED: Humans also need Boids to avoid stacking when spawned
           { id: 'GENE_BOIDS', params: { separationRadius: 30, separationForce: 200.0, cohesionWeight: 0.0 } }
       ]
   },
@@ -290,6 +302,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_MELEE_ATTACK', params: {} },
+          { id: 'GENE_HARDENED_SKIN', params: { amount: 5 } },
           { id: 'GENE_BOIDS', params: { separationRadius: 35, separationForce: 250.0, cohesionWeight: 0.0 } }
       ]
   },
@@ -323,6 +336,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 600 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: { projectileSpeed: 20 } },
+          { id: 'GENE_EXECUTE', params: { threshold: 0.5, multiplier: 2.0 } },
           { id: 'GENE_BOIDS', params: { separationRadius: 25, separationForce: 200.0, cohesionWeight: 0.0 } }
       ]
   },
@@ -342,6 +356,7 @@ export const UNIT_CONFIGS: Record<UnitType, UnitConfig> = {
           { id: 'GENE_ACQUIRE_TARGET', params: { range: 500 } },
           { id: 'GENE_AUTO_ATTACK', params: {} },
           { id: 'GENE_RANGED_ATTACK', params: {} },
+          { id: 'GENE_SPLASH_ZONE', params: { range: 60, ratio: 0.5 } },
           { id: 'GENE_ELEMENTAL_HIT', params: {} },
           { id: 'GENE_BOIDS', params: { separationRadius: 60, separationForce: 400.0, cohesionWeight: 0.0 } }
       ]
@@ -483,6 +498,12 @@ export const INITIAL_GAME_STATE: GameSaveData = {
     player: {
         lastSaveTime: Date.now(),
         prestigeLevel: 0,
+        lifetimeDna: 0,
+        mutationUpgrades: {
+            metabolicSurge: 0,
+            larvaFission: 0,
+            geneticMemory: false
+        },
         settings: {
             bgmVolume: 0.5,
             sfxVolume: 0.5

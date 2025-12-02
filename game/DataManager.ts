@@ -95,6 +95,16 @@ export class DataManager {
                     this.state.hive.production.larvaCapBase = INITIAL_LARVA_CAP;
                     this.state.resources.larva = INITIAL_LARVA_CAP;
                 }
+                // Init new Prestige fields
+                if (this.state.player.mutationUpgrades === undefined) {
+                    this.state.player.mutationUpgrades = {
+                        metabolicSurge: 0,
+                        larvaFission: 0,
+                        geneticMemory: false
+                    };
+                    this.state.player.lifetimeDna = 0;
+                }
+
                 if (this.state.player.totalKills === undefined) this.state.player.totalKills = 0;
                 Object.values(UnitType).forEach(uType => {
                     const u = uType as UnitType;
@@ -132,6 +142,12 @@ export class DataManager {
 
     public modifyResource(type: keyof Resources, amount: number) {
         this.state.resources[type] += amount;
+        
+        // Track Lifetime DNA for Prestige
+        if (type === 'dna' && amount > 0) {
+            this.state.player.lifetimeDna = (this.state.player.lifetimeDna || 0) + amount;
+        }
+
         if (type === 'larva') {
             const max = this.state.hive.production.larvaCapBase;
             if (this.state.resources.larva > max) this.state.resources.larva = max;
@@ -163,6 +179,11 @@ export class DataManager {
         const meta: any = this.state.hive.metabolism;
         const res = this.state.resources;
         const conf = METABOLISM_FACILITIES;
+        
+        // Prestige Bonus: Metabolism Surge
+        const surgeLevel = this.state.player.mutationUpgrades?.metabolicSurge || 0;
+        const globalMultiplier = 1 + (surgeLevel * 0.5); // +50% per level
+
         let bioRate = 0;
         let enzRate = 0;
         let dnaRate = 0;
@@ -183,6 +204,8 @@ export class DataManager {
             bioRate += meta.gaiaDigesterCount * conf.GAIA_DIGESTER.COEFF * Math.pow(Math.max(1, res.biomass), conf.GAIA_DIGESTER.POW_FACTOR);
         }
 
+        // Apply Global Multiplier
+        bioRate *= globalMultiplier;
         this.modifyResource('biomass', bioRate * dt);
 
         if (meta.fermentingSacCount > 0) {
@@ -196,7 +219,7 @@ export class DataManager {
                 const productionRate = (consumptionRate / cost) * conf.SAC.OUTPUT;
                 enzRate += productionRate;
                 this.modifyResource('biomass', -consumed);
-                this.modifyResource('enzymes', productionRate * dt);
+                this.modifyResource('enzymes', productionRate * dt * globalMultiplier);
             }
         }
 
@@ -208,7 +231,7 @@ export class DataManager {
                      const productionRate = meta.thermalCrackerCount * conf.CRACKER.OUTPUT;
                      enzRate += productionRate;
                      this.modifyResource('biomass', -inputNeeded);
-                     this.modifyResource('enzymes', productionRate * dt);
+                     this.modifyResource('enzymes', productionRate * dt * globalMultiplier);
                      meta.crackerHeat += conf.CRACKER.HEAT_GEN * dt;
                      if (meta.crackerHeat >= 100) { meta.crackerHeat = 100; meta.crackerOverheated = true; }
                  } else {
@@ -226,7 +249,7 @@ export class DataManager {
                 const productionRate = meta.fleshBoilerCount * conf.BOILER.OUTPUT_ENZ;
                 enzRate += productionRate;
                 this.modifyResource('larva', -larvaNeeded);
-                this.modifyResource('enzymes', productionRate * dt);
+                this.modifyResource('enzymes', productionRate * dt * globalMultiplier);
             }
         }
 
@@ -235,7 +258,7 @@ export class DataManager {
             const eatChance = (meta.bloodFusionCount || 0) * 1.0 * dt;
             if (meleeStock >= 1 && Math.random() < eatChance) {
                 this.state.hive.unitStockpile['MELEE']--;
-                this.modifyResource('enzymes', conf.BLOOD_FUSION.OUTPUT_ENZ);
+                this.modifyResource('enzymes', conf.BLOOD_FUSION.OUTPUT_ENZ * globalMultiplier);
                 this.events.emit('STOCKPILE_CHANGED', this.state.hive.unitStockpile);
             }
         }
@@ -244,7 +267,7 @@ export class DataManager {
             const totalPop = this.getTotalStockpile();
             const resGen = (meta.synapticResonatorCount || 0) * Math.sqrt(totalPop) * conf.RESONATOR.POP_SCALAR * dt;
             enzRate += resGen / dt;
-            this.modifyResource('enzymes', resGen);
+            this.modifyResource('enzymes', resGen * globalMultiplier);
         }
 
         if ((meta.entropyVentCount || 0) > 0) {
@@ -254,14 +277,14 @@ export class DataManager {
                 const gainRate = (burnAmount / dt) * conf.ENTROPY_VENT.CONVERT_RATIO;
                 enzRate += gainRate;
                 this.modifyResource('biomass', -burnAmount);
-                this.modifyResource('enzymes', gainRate * dt);
+                this.modifyResource('enzymes', gainRate * dt * globalMultiplier);
             }
         }
 
         if (meta.thoughtSpireCount > 0) {
              const spireRate = meta.thoughtSpireCount * conf.SPIRE.BASE_RATE;
              dnaRate += spireRate;
-             meta.spireAccumulator += spireRate * dt;
+             meta.spireAccumulator += spireRate * dt * globalMultiplier;
              if (meta.spireAccumulator >= 1) {
                  const drop = Math.floor(meta.spireAccumulator);
                  meta.spireAccumulator -= drop;
@@ -273,14 +296,14 @@ export class DataManager {
             const totalPop = this.getTotalStockpile();
             const hiveGen = meta.hiveMindCount * Math.sqrt(Math.max(1, totalPop)) * conf.HIVE_MIND.SCALAR * dt;
             dnaRate += hiveGen / dt;
-            this.modifyResource('dna', hiveGen);
+            this.modifyResource('dna', hiveGen * globalMultiplier);
         }
 
         if ((meta.combatCortexCount || 0) > 0) {
              const melee = this.state.hive.unitStockpile['MELEE'] || 0;
              const cortexGen = (meta.combatCortexCount || 0) * (melee * 0.1) * conf.COMBAT_CORTEX.BASE_RATE * dt;
              dnaRate += cortexGen / dt;
-             this.modifyResource('dna', cortexGen);
+             this.modifyResource('dna', cortexGen * globalMultiplier);
         }
 
         if (meta.akashicRecorderCount > 0 && Math.random() < conf.RECORDER.CHANCE * dt) {
@@ -297,7 +320,12 @@ export class DataManager {
         const prod = this.state.hive.production;
         const queenCount = this.state.hive.unitStockpile[UnitType.QUEEN] || 0;
         if (queenCount < 1) return;
-        const interval = 5.0 * Math.pow(0.9, prod.queenIntervalLevel - 1);
+        
+        // Prestige Bonus: Larva Fission
+        const fissionLevel = this.state.player.mutationUpgrades?.larvaFission || 0;
+        const intervalMult = 1 / (1 + fissionLevel); // +100% speed = 0.5x interval
+
+        const interval = (5.0 * Math.pow(0.9, prod.queenIntervalLevel - 1)) * intervalMult;
         prod.queenTimer = (prod.queenTimer || 0) + dt;
         if (prod.queenTimer >= interval) {
             prod.queenTimer = 0;
@@ -429,7 +457,9 @@ export class DataManager {
 
     public getQueenStats() {
         const prod = this.state.hive.production;
-        const interval = 5.0 * Math.pow(0.9, prod.queenIntervalLevel - 1);
+        const fissionLevel = this.state.player.mutationUpgrades?.larvaFission || 0;
+        const intervalMult = 1 / (1 + fissionLevel);
+        const interval = (5.0 * Math.pow(0.9, prod.queenIntervalLevel - 1)) * intervalMult;
         const amount = 1 * prod.queenAmountLevel;
         return {
             interval,
@@ -469,20 +499,72 @@ export class DataManager {
         this.events.emit('STOCKPILE_CHANGED', this.state.hive.unitStockpile);
     }
     
+    // --- PRESTIGE SYSTEM ---
+    public getPrestigeReward(): number {
+        const lifetimeDna = this.state.player.lifetimeDna || 0;
+        if (lifetimeDna < 1000) return 0;
+        return Math.floor(Math.sqrt(lifetimeDna / 1000));
+    }
+
     public prestige() {
-        const sacrifice = this.state.resources.biomass;
-        const reward = Math.floor(Math.sqrt(sacrifice / 10));
+        const reward = this.getPrestigeReward();
         if (reward <= 0 && this.state.player.prestigeLevel === 0) return;
+        
         const newMutagen = this.state.resources.mutagen + reward;
         const newPrestigeLevel = this.state.player.prestigeLevel + 1;
+        
+        // Persist Mutations & Upgrades
         const keptPlugins = this.state.hive.inventory.plugins;
+        const keptUpgrades = this.state.player.mutationUpgrades || {
+            metabolicSurge: 0,
+            larvaFission: 0,
+            geneticMemory: false
+        };
+
+        // Reset
         this.state = JSON.parse(JSON.stringify(INITIAL_GAME_STATE));
+        
+        // Restore
         this.state.resources.mutagen = newMutagen;
         this.state.hive.inventory.plugins = keptPlugins;
         this.state.player.prestigeLevel = newPrestigeLevel;
+        this.state.player.mutationUpgrades = keptUpgrades;
+        this.state.player.lifetimeDna = 0; // Reset lifetime counter for next run? Or keep? Design doc implies resets "progress", usually lifetime counters for next run start from 0 relative to new run or cumulative. Design formula is just lifetime. Let's reset to avoid double dipping.
+
+        // Genetic Memory: Start with Sac
+        if (keptUpgrades.geneticMemory) {
+             this.state.hive.metabolism.fermentingSacCount = 1;
+        }
+
         this.saveGame();
         this.events.emit('RESOURCE_CHANGED', {});
         window.location.reload(); 
+    }
+
+    public buyMutationUpgrade(type: 'SURGE' | 'FISSION' | 'MEMORY') {
+        const upgrades = this.state.player.mutationUpgrades!;
+        if (type === 'SURGE') {
+            if (this.state.resources.mutagen >= 1) {
+                this.state.resources.mutagen -= 1;
+                upgrades.metabolicSurge++;
+                this.saveGame();
+                this.events.emit('RESOURCE_CHANGED', {});
+            }
+        } else if (type === 'FISSION') {
+            if (this.state.resources.mutagen >= 3) {
+                this.state.resources.mutagen -= 3;
+                upgrades.larvaFission++;
+                this.saveGame();
+                this.events.emit('RESOURCE_CHANGED', {});
+            }
+        } else if (type === 'MEMORY') {
+            if (!upgrades.geneticMemory && this.state.resources.mutagen >= 10) {
+                this.state.resources.mutagen -= 10;
+                upgrades.geneticMemory = true;
+                this.saveGame();
+                this.events.emit('RESOURCE_CHANGED', {});
+            }
+        }
     }
     
     public upgradeUnit(type: UnitType): boolean {
@@ -541,7 +623,7 @@ export class DataManager {
         const lvlMultDmg = 1 + (save.level - 1) * config.growthFactors.damage;
         const runMultHp = mods.maxHpMultiplier;
         const runMultDmg = mods.damageMultiplier;
-        const mutagenMult = 1 + (this.state.resources.mutagen * 0.1); 
+        const mutagenMult = 1; // Mutagen now used for Upgrades, not flat stat multiplier
         
         let pluginMultHp = 0, pluginMultDmg = 0, pluginMultSpeed = 0, pluginMultAttackSpeed = 0, pluginFlatCritChance = 0, pluginMultCritChance = 0, pluginMultCritDmg = 0;
         let element: ElementType = config.elementConfig?.type || 'PHYSICAL'; 
@@ -626,7 +708,6 @@ export class DataManager {
         const config: any = METABOLISM_FACILITIES[key as keyof typeof METABOLISM_FACILITIES];
         if (!config) return { cost: 999999, resource: 'biomass' };
         
-        // Simplified count key mapping using a generic approach or specific mapping
         let countKey = '';
         if (key === 'VILLI') countKey = 'villiCount';
         else if (key === 'TAPROOT') countKey = 'taprootCount';

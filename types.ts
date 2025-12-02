@@ -38,7 +38,9 @@ export type StatusType =
     | 'SHOCKED'      
     | 'POISONED'     
     | 'ARMOR_BROKEN' 
-    | 'STUNNED';     
+    | 'STUNNED'
+    | 'FRENZY'       
+    | 'SLOWED';
 
 export interface StatusEffect {
     type: StatusType;
@@ -215,6 +217,12 @@ export interface PlayerProfile {
     lastSaveTime: number;
     prestigeLevel: number;
     totalKills?: number;
+    lifetimeDna?: number; // For Prestige calculation
+    mutationUpgrades?: {
+        metabolicSurge: number;
+        larvaFission: number;
+        geneticMemory: boolean;
+    };
     settings: {
         bgmVolume: number;
         sfxVolume: number;
@@ -319,6 +327,9 @@ export interface IGameEngine {
     applyStatus: (target: IUnit, type: StatusType, stacks: number, duration: number) => void;
     processDamagePipeline: (source: IUnit, target: IUnit) => void;
     performAttack: (source: IUnit, target: IUnit) => void;
+    
+    // New: Unit Spawning Hook
+    spawnUnit: (faction: Faction, type: UnitType, x: number) => IUnit | null;
 }
 
 export interface GeneTrait {
@@ -331,13 +342,18 @@ export interface GeneTrait {
     // Movement Logic
     onMove?: (self: IUnit, velocity: {x:number, y:number}, dt: number, engine: IGameEngine, params: any) => void; 
     
-    // Targeting Logic (Refactored v2.1: Gene is fully responsible for query & validation)
+    // Targeting Logic
     onUpdateTarget?: (self: IUnit, dt: number, engine: IGameEngine, params: any) => void;
     
     // Combat Hooks
     onPreAttack?: (self: IUnit, target: IUnit, engine: IGameEngine, params: any) => boolean; 
     onHit?: (self: IUnit, target: IUnit, damage: number, engine: IGameEngine, params: any) => void;
     onDeath?: (self: IUnit, engine: IGameEngine, params: any) => void;
+
+    // [New] Defensive Hook: Allows modification of incoming damage
+    onWasHit?: (self: IUnit, attacker: IUnit, damage: number, engine: IGameEngine, params: any) => number;
+    // [New] Kill Hook: Triggered when self kills a victim
+    onKill?: (self: IUnit, victim: IUnit, engine: IGameEngine, params: any) => void;
 }
 
 export interface IUnit {

@@ -355,6 +355,13 @@ export class GameEngine implements IGameEngine {
           this.gracePeriodTimer = 2.0;
       }
   }
+  
+  public spawnUnit(faction: Faction, type: UnitType, x: number): IUnit | null {
+      if (this.unitPool) {
+          return this.unitPool.spawn(faction, type, x, this.modifiers);
+      }
+      return null;
+  }
 
   private applyStockpileAI(unit: Unit) {
       unit.geneConfig = [
@@ -683,7 +690,12 @@ export class GameEngine implements IGameEngine {
       const elementType = source.stats.element;
       let rawDamage = source.stats.damage;
       
-      // GENE HOOK: OnHit
+      // [NEW] FRENZY BUFF CHECK
+      if (source.statuses['FRENZY']) {
+          rawDamage *= 1.25; // 25% Damage Bonus
+      }
+
+      // 1. GENE HOOK: OnHit (Attacker)
       if (source.geneConfig) {
           source.geneConfig.forEach(cfg => { 
              const gene = GeneLibrary.get(cfg.id);
@@ -691,17 +703,44 @@ export class GameEngine implements IGameEngine {
           });
       }
 
-      // ELEMENTAL REGISTRY
+      // 2. ELEMENTAL REGISTRY
       ReactionRegistry.handle(target, elementType, this, rawDamage);
 
+      // 3. [NEW] GENE HOOK: OnWasHit (Target/Defender)
+      if (target.geneConfig) {
+          for (const cfg of target.geneConfig) {
+              const gene = GeneLibrary.get(cfg.id);
+              if (gene && gene.onWasHit) {
+                  const modified = gene.onWasHit(target, source, rawDamage, this, cfg.params || {});
+                  if (typeof modified === 'number') {
+                      rawDamage = modified;
+                  }
+              }
+          }
+      }
+
+      // 4. Armor Calculation
       let armor = target.stats.armor;
       if (target.statuses['ARMOR_BROKEN']) armor = 0; 
       const reduction = armor / (armor + 50);
-      let finalDamage = rawDamage * (1 - reduction);
-      target.stats.hp -= finalDamage;
+      let finalDamage = Math.max(1, rawDamage * (1 - reduction));
       
+      // 5. Apply Damage
+      target.stats.hp -= finalDamage;
       if (target.view) { target.flashTimer = 0.1; }
-      if (target.stats.hp <= 0) this.killUnit(target);
+
+      // 6. [NEW] Kill Check
+      if (target.stats.hp <= 0) {
+          this.killUnit(target);
+          
+          // GENE HOOK: OnKill (Attacker)
+          if (source.geneConfig) {
+              for (const cfg of source.geneConfig) {
+                  const gene = GeneLibrary.get(cfg.id);
+                  if (gene && gene.onKill) gene.onKill(source, target, this, cfg.params || {});
+              }
+          }
+      }
   }
 
   public dealTrueDamage(target: IUnit, amount: number) {

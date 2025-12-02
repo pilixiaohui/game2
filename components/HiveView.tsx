@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { GameSaveData, UnitType, HiveSection, Polarity, GameStateSnapshot, RegionData } from '../types';
 import { UNIT_CONFIGS, METABOLISM_FACILITIES, BIO_PLUGINS, PLAYABLE_UNITS, CLICK_CONFIG } from '../constants';
@@ -87,21 +88,123 @@ export const HiveView: React.FC<HiveViewProps> = ({
       );
   };
 
-  const renderEvolution = () => (
-    <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in slide-in-from-right-4 duration-300">
-        <div className="w-24 h-24 bg-gray-900 rounded-full flex items-center justify-center mb-6 border-2 border-dashed border-gray-700 text-4xl grayscale opacity-50">
-            🧬
+  const renderEvolution = () => {
+      const reward = DataManager.instance.getPrestigeReward();
+      const currentMutagen = globalState.resources.mutagen;
+      const upgrades = globalState.player.mutationUpgrades || { metabolicSurge: 0, larvaFission: 0, geneticMemory: false };
+
+      return (
+        <div className="flex flex-col h-full p-8 animate-in fade-in slide-in-from-right-4 duration-300 max-w-7xl mx-auto">
+            <div className="mb-8">
+                <h3 className="text-4xl font-black text-yellow-500 uppercase tracking-widest mb-2">进化与飞升 (Evolution)</h3>
+                <p className="text-gray-400">吞噬世界，重塑基因，获得永久力量。</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
+                {/* PRESTIGE BUTTON */}
+                <div className="bg-gradient-to-br from-red-900/20 to-black border border-red-900/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+                     <div className="absolute inset-0 bg-red-600/5 group-hover:bg-red-600/10 transition-colors" />
+                     
+                     <div className="text-6xl mb-4 animate-pulse">🪐</div>
+                     <h2 className="text-3xl font-black text-white uppercase mb-2">吞噬世界 (Devour World)</h2>
+                     <p className="text-gray-500 mb-8 max-w-md">
+                         重置所有资源、建筑和单位。<br/>
+                         基于 <span className="text-blue-400 font-mono font-bold">Lifetime DNA</span> 获得突变原 (Mutagen)。
+                     </p>
+
+                     <div className="bg-black/50 p-6 rounded-xl border border-gray-800 w-full max-w-sm mb-8">
+                         <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Current Reward</div>
+                         <div className="text-4xl font-black text-yellow-500 font-mono">+{reward} <span className="text-sm">Mutagen</span></div>
+                         <div className="text-[10px] text-gray-600 mt-2">Next at: {Math.pow(reward + 1, 2) * 1000} Lifetime DNA</div>
+                     </div>
+
+                     <button
+                        onClick={() => { if (confirm("ARE YOU SURE? THIS WILL RESET YOUR PROGRESS.")) DataManager.instance.prestige(); }}
+                        className={`px-8 py-4 rounded text-xl font-black uppercase tracking-widest transition-all ${reward > 0 ? 'bg-red-600 hover:bg-red-500 text-white shadow-[0_0_30px_rgba(220,38,38,0.5)]' : 'bg-gray-800 text-gray-600 cursor-not-allowed'}`}
+                        disabled={reward <= 0}
+                     >
+                         PRESTIGE
+                     </button>
+                </div>
+
+                {/* MUTATION UPGRADES */}
+                <div className="flex flex-col gap-4">
+                    <div className="bg-yellow-900/10 border border-yellow-500/30 p-6 rounded-xl flex justify-between items-center">
+                        <div>
+                             <h4 className="font-bold text-yellow-500 uppercase">Available Mutagen</h4>
+                        </div>
+                        <div className="text-3xl font-mono font-black text-white">{currentMutagen}</div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 overflow-y-auto">
+                        {/* 1. Metabolism Surge */}
+                        <div className="bg-gray-900 border border-gray-800 p-6 rounded-xl flex flex-col justify-between">
+                             <div>
+                                 <div className="flex justify-between mb-2">
+                                     <h5 className="font-bold text-white text-lg">Metabolism Surge</h5>
+                                     <span className="text-yellow-500 font-mono">Lvl {upgrades.metabolicSurge}</span>
+                                 </div>
+                                 <p className="text-gray-400 text-xs mb-4">Increase global resource production multiplier by +50% per level.</p>
+                             </div>
+                             <div className="flex justify-between items-center mt-auto">
+                                 <span className="text-xs text-gray-500">Current: x{(1 + upgrades.metabolicSurge * 0.5).toFixed(1)}</span>
+                                 <button
+                                    onClick={() => DataManager.instance.buyMutationUpgrade('SURGE')}
+                                    disabled={currentMutagen < 1}
+                                    className={`px-4 py-2 rounded text-xs font-bold uppercase ${currentMutagen >= 1 ? 'bg-yellow-600 text-white hover:bg-yellow-500' : 'bg-gray-800 text-gray-600'}`}
+                                 >
+                                     Upgrade (1 Pt)
+                                 </button>
+                             </div>
+                        </div>
+
+                        {/* 2. Larva Fission */}
+                        <div className="bg-gray-900 border border-gray-800 p-6 rounded-xl flex flex-col justify-between">
+                             <div>
+                                 <div className="flex justify-between mb-2">
+                                     <h5 className="font-bold text-white text-lg">Larva Fission</h5>
+                                     <span className="text-pink-500 font-mono">Lvl {upgrades.larvaFission}</span>
+                                 </div>
+                                 <p className="text-gray-400 text-xs mb-4">Increases Queen spawn rate by +100% per level.</p>
+                             </div>
+                             <div className="flex justify-between items-center mt-auto">
+                                 <span className="text-xs text-gray-500">Current: +{upgrades.larvaFission * 100}%</span>
+                                 <button
+                                    onClick={() => DataManager.instance.buyMutationUpgrade('FISSION')}
+                                    disabled={currentMutagen < 3}
+                                    className={`px-4 py-2 rounded text-xs font-bold uppercase ${currentMutagen >= 3 ? 'bg-pink-600 text-white hover:bg-pink-500' : 'bg-gray-800 text-gray-600'}`}
+                                 >
+                                     Upgrade (3 Pts)
+                                 </button>
+                             </div>
+                        </div>
+
+                        {/* 3. Genetic Memory */}
+                        <div className="bg-gray-900 border border-gray-800 p-6 rounded-xl flex flex-col justify-between">
+                             <div>
+                                 <div className="flex justify-between mb-2">
+                                     <h5 className="font-bold text-white text-lg">Genetic Memory</h5>
+                                     <span className="text-blue-500 font-mono">{upgrades.geneticMemory ? 'ACTIVE' : 'LOCKED'}</span>
+                                 </div>
+                                 <p className="text-gray-400 text-xs mb-4">Start new runs with "Fermentation Sac" unlocked, skipping the early grind.</p>
+                             </div>
+                             <div className="flex justify-between items-center mt-auto">
+                                 <span className="text-xs text-gray-500">{upgrades.geneticMemory ? 'Permanent' : 'One-time unlock'}</span>
+                                 <button
+                                    onClick={() => DataManager.instance.buyMutationUpgrade('MEMORY')}
+                                    disabled={currentMutagen < 10 || upgrades.geneticMemory}
+                                    className={`px-4 py-2 rounded text-xs font-bold uppercase ${upgrades.geneticMemory ? 'bg-green-600 text-white cursor-default' : currentMutagen >= 10 ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-gray-800 text-gray-600'}`}
+                                 >
+                                     {upgrades.geneticMemory ? 'OWNED' : 'Unlock (10 Pts)'}
+                                 </button>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <h3 className="text-2xl font-black text-gray-500 uppercase tracking-widest mb-2">Evolution Chamber</h3>
-        <p className="text-gray-600 max-w-md">
-            The gene sequencer is currently dormant. <br/>
-            Advanced strain modifications will be available in future updates.
-        </p>
-        <div className="mt-8 px-4 py-2 bg-yellow-900/10 border border-yellow-900/30 text-yellow-700 text-xs rounded uppercase tracking-widest">
-            Module Offline
-        </div>
-    </div>
-  );
+      );
+  };
 
   const renderMetabolism = () => {
     const meta = globalState.hive.metabolism;
@@ -596,8 +699,6 @@ export const HiveView: React.FC<HiveViewProps> = ({
                                 </div>
                             </div>
                         </div>
-                        
-                        {/* REMOVED PROGRESS BAR VISUALIZATION */}
 
                         <div className="grid grid-cols-3 gap-2">
                              <button

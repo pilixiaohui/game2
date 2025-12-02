@@ -1,6 +1,6 @@
 
 
-import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType, Faction } from '../types';
+import { GeneTrait, IUnit, ElementType, IGameEngine, StatusType, Faction, UnitType } from '../types';
 import { ELEMENT_COLORS, STATUS_CONFIG, UNIT_CONFIGS } from '../constants';
 
 // --- STATUS REGISTRY ---
@@ -50,6 +50,10 @@ StatusRegistry.registerVisual('POISONED', 0x4ade80);
 
 StatusRegistry.registerVisual('FROZEN', 0x60a5fa);
 StatusRegistry.registerVisual('SHOCKED', 0xfacc15);
+
+// New Status Visuals
+StatusRegistry.registerVisual('FRENZY', 0xff00ff); // Magenta for Zerg Rage
+StatusRegistry.registerVisual('SLOWED', 0x555555); // Grey for Fear/Slow
 
 // --- ELEMENTAL REACTION REGISTRY ---
 type ReactionHandler = (target: IUnit, engine: IGameEngine, damage: number) => void;
@@ -111,7 +115,405 @@ export class GeneLibrary {
     }
 }
 
-// --- STANDARD GENES ---
+// ==========================================
+// A. 攻击增强类 (Attack Modifiers)
+// ==========================================
+
+GeneLibrary.register({
+    id: 'GENE_VAMPIRIC',
+    name: '吸血',
+    onHit: (self, target, damage, engine, params) => {
+        const ratio = params.ratio || 0.3; // Default 30%
+        if (self.stats.hp < self.stats.maxHp && !self.isDead) {
+            const heal = damage * ratio;
+            self.stats.hp = Math.min(self.stats.maxHp, self.stats.hp + heal);
+            if (Math.random() < 0.2) engine.createHealEffect(self.x, self.y);
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_EXECUTE',
+    name: '斩杀',
+    onHit: (self, target, damage, engine, params) => {
+        const threshold = params.threshold || 0.3; // 30% HP
+        const mult = params.multiplier || 2.0;
+        
+        if ((target.stats.hp / target.stats.maxHp) < threshold) {
+            const extra = damage * (mult - 1);
+            engine.dealTrueDamage(target, extra);
+            engine.createFloatingText(target.x, target.y - 40, "CRUSH!", 0xff0000, 14);
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_GIANT_SLAYER',
+    name: '巨人杀手',
+    onHit: (self, target, damage, engine, params) => {
+        const diff = target.stats.maxHp / self.stats.maxHp;
+        if (diff > 2.0) {
+            const extraPct = params.extraPct || 0.05;
+            engine.dealTrueDamage(target, target.stats.maxHp * extraPct);
+            if (Math.random() < 0.3) engine.createFloatingText(target.x, target.y - 40, "SLAYER", 0xffaa00, 10);
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_SPLASH_ZONE',
+    name: '腐蚀溅射',
+    onHit: (self, target, damage, engine, params) => {
+        if (self.context.isSplashing) return;
+        self.context.isSplashing = true;
+
+        const range = params.range || 50;
+        const ratio = params.ratio || 0.3;
+        
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(target.x, target.y, range, neighbors);
+        
+        // Preserve original damage to prevent mutation
+        const originalDmg = self.stats.damage;
+        self.stats.damage = originalDmg * ratio;
+        
+        for(let i=0; i<count; i++) {
+            const u = neighbors[i];
+            if (u !== target && u !== self && u.faction !== self.faction && !u.isDead) {
+                // Use pipeline to apply status effects
+                engine.processDamagePipeline(self, u);
+            }
+        }
+        
+        self.stats.damage = originalDmg;
+        self.context.isSplashing = false;
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_CHAIN_ARC',
+    name: '连锁电弧',
+    onHit: (self, target, damage, engine, params) => {
+        // Multi-bounce Logic
+        const currentDepth = self.context.chainDepth || 0;
+        const maxDepth = params.maxDepth || 3; // Bounce up to 3 times
+
+        if (currentDepth >= maxDepth) return;
+
+        const range = params.range || 180;
+        const decay = params.decay || 0.7; // Damage decays by 30% per bounce
+        
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(target.x, target.y, range, neighbors);
+        
+        let nextTarget: IUnit | null = null;
+        let minDist = 999999;
+        
+        for(let i=0; i<count; i++) {
+            const u = neighbors[i];
+            // Valid Target: Not self, not current target, enemy faction, alive
+            if (u !== target && u !== self && u.faction !== self.faction && !u.isDead) {
+                // Prevent bouncing back to the immediate previous target to avoid A<->B infinite loop
+                if (u.id === self.context.prevChainTargetId) continue;
+
+                const d = (u.x - target.x)**2 + (u.y - target.y)**2;
+                if (d < minDist) { minDist = d; nextTarget = u; }
+            }
+        }
+        
+        if (nextTarget) {
+            // Visuals
+            engine.createProjectile(target.x, target.y, nextTarget.x, nextTarget.y, 0xfacc15);
+            
+            // State Management for Recursion
+            self.context.chainDepth = currentDepth + 1;
+            const prevId = self.context.prevChainTargetId;
+            self.context.prevChainTargetId = target.id;
+
+            const originalDmg = self.stats.damage;
+            self.stats.damage = originalDmg * decay;
+            
+            // Recursively trigger pipeline (which calls onHit -> GENE_CHAIN_ARC again)
+            engine.processDamagePipeline(self, nextTarget);
+            
+            // Restore State
+            self.stats.damage = originalDmg;
+            self.context.chainDepth = currentDepth;
+            self.context.prevChainTargetId = prevId;
+        } else {
+            // End of chain cleanup (optional, context is per-unit but transient enough in logic)
+            self.context.chainDepth = 0;
+            self.context.prevChainTargetId = -1;
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_POISON_TOUCH',
+    name: '剧毒触碰',
+    onHit: (self, target, damage, engine, params) => {
+        engine.applyStatus(target, 'POISONED', params.stacks || 2, 5);
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_RAMPAGE',
+    name: '杀戮盛宴',
+    onKill: (self, victim, engine, params) => {
+        const healPct = params.heal || 0.1;
+        self.stats.hp = Math.min(self.stats.maxHp, self.stats.hp + self.stats.maxHp * healPct);
+        
+        // Reset attack cooldown for immediate strike
+        self.attackCooldown = 0;
+        engine.createFloatingText(self.x, self.y - 40, "RAMPAGE!", 0xff00ff, 16);
+    }
+});
+
+// ==========================================
+// B. 生存与防御类 (Survival & Defense)
+// ==========================================
+
+GeneLibrary.register({
+    id: 'GENE_THORNS',
+    name: '反伤甲壳',
+    onWasHit: (self, attacker, damage, engine, params) => {
+        const reflect = params.ratio || 0.3;
+        const distSq = (self.x - attacker.x)**2 + (self.y - attacker.y)**2;
+        if (distSq < 100*100) {
+            engine.dealTrueDamage(attacker, damage * reflect);
+            engine.createFlash(self.x, self.y, 0x88ff88);
+        }
+        return damage;
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_HARDENED_SKIN',
+    name: '硬化皮肤',
+    onWasHit: (self, attacker, damage, engine, params) => {
+        const flatBlock = params.amount || 5;
+        const reduced = Math.max(1, damage - flatBlock);
+        if (damage > reduced) {
+             if (Math.random() < 0.2) engine.createFloatingText(self.x, self.y - 20, "BLOCK", 0xaaaaaa, 10);
+        }
+        return reduced;
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_MARTYR',
+    name: '殉道者',
+    onDeath: (self, engine, params) => {
+        const range = params.range || 100;
+        const heal = self.stats.maxHp * 0.5;
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(self.x, self.y, range, neighbors);
+        
+        engine.createShockwave(self.x, self.y, range, 0x00ff00);
+        
+        for(let i=0; i<count; i++) {
+            const u = neighbors[i];
+            if (u.faction === self.faction && !u.isDead) {
+                u.stats.hp = Math.min(u.stats.maxHp, u.stats.hp + heal);
+                engine.createHealEffect(u.x, u.y);
+            }
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_PHASE_SHIFT',
+    name: '相位护盾',
+    onTick: (self, dt, engine, params) => {
+        self.context.phaseCharge = (self.context.phaseCharge || 0) + dt;
+        if (self.context.phaseCharge >= 10 && !self.context.phaseReady) {
+            self.context.phaseReady = true;
+            engine.createFloatingText(self.x, self.y - 20, "SHIELD UP", 0x60a5fa, 10);
+        }
+    },
+    onWasHit: (self, attacker, damage, engine, params) => {
+        if (self.context.phaseReady) {
+            self.context.phaseReady = false;
+            self.context.phaseCharge = 0;
+            engine.createShockwave(self.x, self.y, 20, 0x60a5fa);
+            engine.createFloatingText(self.x, self.y - 20, "PHASED", 0x60a5fa, 10);
+            return 0; // Negate damage
+        }
+        return damage;
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_BERSERKER_BLOOD',
+    name: '狂战之血',
+    onTick: (self, dt, engine, params) => {
+        if (!self.context.baseDmg) self.context.baseDmg = self.stats.damage;
+        
+        const missingPct = 1 - (self.stats.hp / self.stats.maxHp);
+        self.stats.damage = self.context.baseDmg * (1 + missingPct);
+    }
+});
+
+// ==========================================
+// C. 战术与移动类 (Tactics)
+// ==========================================
+
+GeneLibrary.register({
+    id: 'GENE_BURROW_HEAL',
+    name: '潜地愈合',
+    onTick: (self, dt, engine, params) => {
+        // Allows healing in Stockpile (WANDER) or Combat Idle
+        if (self.state === 'IDLE' || self.state === 'WANDER') {
+            self.context.idleTime = (self.context.idleTime || 0) + dt;
+            if (self.context.idleTime > 2.0) {
+                // Heal fast
+                self.stats.hp = Math.min(self.stats.maxHp, self.stats.hp + self.stats.maxHp * 0.1 * dt);
+                if (Math.random() < 0.05) engine.createHealEffect(self.x, self.y);
+                if (self.view) self.view.alpha = 0.5; // Visual stealth
+            }
+        } else {
+            self.context.idleTime = 0;
+            if (self.view) self.view.alpha = 1.0;
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_DASH_CHARGE',
+    name: '冲锋',
+    onMove: (self, velocity, dt, engine, params) => {
+        const cd = self.context['dash_cd'] || 0;
+        if (cd > 0) {
+            self.context['dash_cd'] = cd - dt;
+        } else if (self.target && !self.target.isDead) {
+            const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
+            const engageRange = 300 * 300;
+            
+            // If out of range but close enough to charge
+            if (distSq > self.stats.range * self.stats.range && distSq < engageRange) {
+                const speedMult = params.speedMult || 3.0;
+                velocity.x *= speedMult;
+                velocity.y *= speedMult;
+                self.context['dash_cd'] = 5.0;
+                engine.createFloatingText(self.x, self.y - 30, "CHARGE!", 0xffffff, 12);
+            }
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_GHOST_WALK',
+    name: '幽灵漫步',
+    onMove: (self, velocity, dt, engine, params) => {
+        // Just purely visual flying bob, physics ignored by not having GENE_BOIDS or careful layering
+        if (self.view) self.view.y += Math.sin(Date.now() / 200) * 0.5;
+    }
+});
+
+// ==========================================
+// D. 光环与控制类 (Auras)
+// ==========================================
+
+GeneLibrary.register({
+    id: 'GENE_COMMAND_AURA',
+    name: '指挥光环',
+    onTick: (self, dt, engine, params) => {
+        self.context.auraTimer = (self.context.auraTimer || 0) + dt;
+        if (self.context.auraTimer < 0.5) return;
+        self.context.auraTimer = 0;
+
+        const range = params.range || 200;
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(self.x, self.y, range, neighbors);
+        
+        for(let i=0; i<count; i++) {
+            const u = neighbors[i];
+            if (u.faction === self.faction) {
+                // Apply FRENZY Status (Handled in processDamagePipeline for +25% DMG)
+                engine.applyStatus(u, 'FRENZY', 1, 0.6); // Duration covers tick interval
+                if (Math.random() < 0.1) engine.createParticles(u.x, u.y, 0xff00ff, 1);
+            }
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_TERROR_PRESENCE',
+    name: '恐惧降临',
+    onTick: (self, dt, engine, params) => {
+        self.context.terrorTimer = (self.context.terrorTimer || 0) + dt;
+        if (self.context.terrorTimer < 0.5) return;
+        self.context.terrorTimer = 0;
+
+        const range = params.range || 200;
+        const neighbors = engine._sharedQueryBuffer;
+        const count = engine.spatialHash.query(self.x, self.y, range, neighbors);
+        
+        for(let i=0; i<count; i++) {
+            const u = neighbors[i];
+            if (u.faction !== self.faction && !u.isDead) {
+                // Apply SLOWED Status
+                engine.applyStatus(u, 'SLOWED', 1, 0.6);
+                if (Math.random() < 0.1) engine.createFloatingText(u.x, u.y - 10, "FEAR", 0x880000, 8);
+            }
+        }
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_STUN_HIT',
+    name: '重击',
+    onHit: (self, target, damage, engine, params) => {
+        if (Math.random() < (params.chance || 0.15)) {
+            engine.applyStatus(target, 'STUNNED', 1, 1.0);
+            engine.createFloatingText(target.x, target.y - 20, "STUN", 0xffff00, 12);
+        }
+    }
+});
+
+// ==========================================
+// E. 召唤与特殊类 (Special)
+// ==========================================
+
+GeneLibrary.register({
+    id: 'GENE_SPAWN_BROOD',
+    name: '亡语：小虫',
+    onDeath: (self, engine, params) => {
+        const count = params.count || 2;
+        for(let i=0; i<count; i++) {
+            const offsetX = (Math.random() - 0.5) * 20;
+            engine.spawnUnit(self.faction, UnitType.MELEE, self.x + offsetX);
+        }
+        engine.createFloatingText(self.x, self.y, "SPAWN!", 0x00ff00, 20);
+    }
+});
+
+GeneLibrary.register({
+    id: 'GENE_SELF_DESTRUCT',
+    name: '自爆程序',
+    onTick: (self, dt, engine, params) => {
+        if (self.context.detonating) {
+             self.context.detonateTimer = (self.context.detonateTimer || 0) + dt;
+             if (self.view) {
+                 const t = Math.sin(Date.now() / 50); // Fast pulse
+                 self.view.tint = t > 0 ? 0xff0000 : 0xffffff;
+                 self.view.scale.set(1.0 + self.context.detonateTimer); // Swell
+             }
+             if (self.context.detonateTimer >= 0.5) {
+                 engine.killUnit(self);
+             }
+        }
+    },
+    onPreAttack: (self, target, engine, params) => {
+        if (!self.context.detonating) {
+            self.context.detonating = true;
+            self.context.detonateTimer = 0;
+        }
+        return false; // Cancel attack
+    }
+});
+
+// --- STANDARD GENES (Existing) ---
 
 GeneLibrary.register({
     id: 'GENE_ACQUIRE_TARGET',
@@ -166,7 +568,7 @@ GeneLibrary.register({
     name: 'Auto Attack Trigger',
     onTick: (self, dt, engine, params) => {
         // Status Check: Stunned/Shocked
-        if (self.statuses['SHOCKED'] && Math.random() < 0.05) return;
+        if ((self.statuses['SHOCKED'] || self.statuses['STUNNED']) && Math.random() < 0.5) return;
 
         if (self.attackCooldown > 0) {
             self.attackCooldown -= dt;
@@ -307,22 +709,22 @@ GeneLibrary.register({
     }
 });
 
-// --- v2.3 REFACTORED MOVEMENT GENES ---
-
 GeneLibrary.register({
     id: 'GENE_WANDER',
     name: 'Idle Wander',
     onMove: (self, velocity, dt, engine, params) => {
-        // Status Check: Stunned/Shocked
-        if (self.statuses['SHOCKED'] && Math.random() < 0.05) return;
+        if ((self.statuses['SHOCKED'] || self.statuses['STUNNED']) && Math.random() < 0.05) return;
 
         self.wanderTimer -= dt;
         if (self.wanderTimer <= 0) { 
             self.wanderTimer = 1 + Math.random() * 2; 
             self.wanderDir = Math.random() > 0.5 ? 1 : -1; 
         }
-        // Wander horizontally, slight vertical drift
-        velocity.x += self.wanderDir * self.stats.speed * 0.3 * dt;
+
+        // Apply SLOWED effect
+        const speedMult = self.statuses['SLOWED'] ? 0.5 : 1.0;
+        
+        velocity.x += self.wanderDir * self.stats.speed * 0.3 * speedMult * dt;
         velocity.y += (Math.random() - 0.5) * 0.5;
         
         self.state = 'WANDER';
@@ -333,34 +735,29 @@ GeneLibrary.register({
     id: 'GENE_COMBAT_MOVEMENT',
     name: 'Combat Movement (Chase/March)',
     onMove: (self, velocity, dt, engine, params) => {
-        // v2.2 Combat State Check: Stop moving if attacking
         if (self.state === 'ATTACK') return;
-        
-        // Status Check: Stunned/Shocked
-        if (self.statuses['SHOCKED'] && Math.random() < 0.05) return;
+        if ((self.statuses['SHOCKED'] || self.statuses['STUNNED']) && Math.random() < 0.05) return;
 
         let isMoving = false;
+        // Apply SLOWED effect
+        const speedMult = self.statuses['SLOWED'] ? 0.5 : 1.0;
+        const moveMult = params.multiplier || 1.0;
 
-        // Battle Mode: Chase or March
         if (self.target && !self.target.isDead) {
-            // Chase logic
             const distSq = (self.target.x - self.x)**2 + (self.target.y - self.y)**2;
             const dist = Math.sqrt(distSq);
-            // v2.2: Stop chasing if within range (Gene Auto Attack handles state switch)
             if (dist > self.stats.range * 0.9) {
                 const dirX = (self.target.x - self.x) / dist;
                 const dirY = (self.target.y - self.y) / dist;
-                velocity.x += dirX * self.stats.speed * self.speedVar * dt;
-                velocity.y += dirY * self.stats.speed * self.speedVar * dt;
+                velocity.x += dirX * self.stats.speed * self.speedVar * speedMult * moveMult * dt;
+                velocity.y += dirY * self.stats.speed * self.speedVar * speedMult * moveMult * dt;
                 isMoving = true;
             }
         } 
-        // March Logic (Default fallback)
         else {
             const moveDir = self.faction === Faction.ZERG ? 1 : -1;
-            // Only march if speed > 0 (static defenses have speed 0)
             if (self.stats.speed > 0) {
-                velocity.x += moveDir * self.stats.speed * self.speedVar * dt;
+                velocity.x += moveDir * self.stats.speed * self.speedVar * speedMult * moveMult * dt;
                 velocity.y += Math.sin(Date.now()/1000 + self.waveOffset) * 20 * dt; 
                 isMoving = true;
             }
@@ -377,7 +774,6 @@ GeneLibrary.register({
     onMove: (self, velocity, dt, engine, params) => {
         if (self.state === 'ATTACK' || self.stats.speed <= 0) return;
 
-        // Time Sliced with Sample & Hold
         const frame = Math.floor(Date.now() / 32); 
         const shouldUpdate = (frame + self.frameOffset) % 3 === 0;
 
@@ -407,11 +803,9 @@ GeneLibrary.register({
                 
                 if (distSq < sepRadius * sepRadius && distSq > 0.001) {
                     const dist = Math.sqrt(distSq);
-                    // FIXED: Inverse distance repulsion to create "Hard Collision" feel
-                    // As dist -> 0, repulsion -> max.
                     const repulsionStrength = Math.min(500, 1000 / (dist + 0.1));
                     
-                    forceX += (dx / dist) * repulsionStrength * sepForceConfig * 0.01; // Scaled down because force config is now high (200)
+                    forceX += (dx / dist) * repulsionStrength * sepForceConfig * 0.01;
                     forceY += (dy / dist) * repulsionStrength * sepForceConfig * 0.01;
                 }
 
@@ -431,7 +825,6 @@ GeneLibrary.register({
                 }
             }
             
-            // FIXED: Random Jitter to prevent perfect stacking equilibrium
             forceX += (Math.random() - 0.5) * 5.0;
             forceY += (Math.random() - 0.5) * 5.0;
 
