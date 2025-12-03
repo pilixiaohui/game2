@@ -388,6 +388,17 @@ export interface RegionData {
   difficultyMultiplier: number;
   totalStages: number;
   spawnTable?: EnemySpawnConfig[]; 
+  
+  levelConfig?: {
+      startLevel: number;
+      levelsPerStage: number;
+  };
+  waveConfig?: {
+      baseCountMin: number;
+      baseCountMax: number;
+      spawnInterval?: number;
+  };
+  
   devourProgress: number;
   isUnlocked: boolean;
   isFighting: boolean;

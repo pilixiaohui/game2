@@ -526,10 +526,19 @@ export class GameEngine implements IGameEngine {
       const regionConfig = INITIAL_REGIONS_CONFIG.find(r => r.id === this.activeRegionId);
       if (!regionConfig) return;
 
-      const totalStages = regionConfig.totalStages;
-      const difficulty = this.humanDifficultyMultiplier * (1 + (stageIdx / totalStages) * 0.5); // +50% growth across region
+      // 1. Calculate Level
+      const startLvl = regionConfig.levelConfig?.startLevel ?? 1;
+      const lvlScale = regionConfig.levelConfig?.levelsPerStage ?? 1;
+      const level = Math.floor(startLvl + (stageIdx * lvlScale));
 
-      const count = Math.floor((3 + Math.random() * 3) * difficulty);
+      // 2. Calculate Count
+      const minCount = regionConfig.waveConfig?.baseCountMin ?? 3;
+      const maxCount = regionConfig.waveConfig?.baseCountMax ?? 6;
+      const baseCount = minCount + Math.random() * (maxCount - minCount);
+      
+      // Preserve difficulty multiplier for massive scaling in later regions, capped by unit pool size naturally
+      const count = Math.floor(baseCount * regionConfig.difficultyMultiplier);
+
       const spawnTable = regionConfig.spawnTable || [{ type: UnitType.HUMAN_MARINE, weight: 1.0 }];
 
       // Helper for weighted random
@@ -543,9 +552,6 @@ export class GameEngine implements IGameEngine {
            }
            return spawnTable[0].type;
       };
-
-      // Determine Level from Stage
-      const level = Math.max(1, stageIdx + 1);
 
       for(let i=0; i<count; i++) {
            const x = stageStart + Math.random() * width;
@@ -726,15 +732,21 @@ export class GameEngine implements IGameEngine {
     
     const regionConfig = INITIAL_REGIONS_CONFIG.find(r => r.id === this.activeRegionId);
     if (!regionConfig) return;
-    const totalStages = regionConfig.totalStages;
 
-    // Difficulty scales based on Region Multiplier + Stage Progress (0 to 1)
-    const difficulty = this.humanDifficultyMultiplier * (1 + (this.currentStageIndex / totalStages) * 0.5); 
+    // 1. Calculate Interval
+    const configInterval = regionConfig.waveConfig?.spawnInterval ?? 4.0;
+    const progressFactor = 1 + (this.currentStageIndex / regionConfig.totalStages); 
+    const baseHumanInterval = Math.max(0.5, configInterval / (regionConfig.difficultyMultiplier * progressFactor));
     
-    const baseHumanInterval = Math.max(0.5, 4.0 / difficulty); 
     this.humanSpawnTimer += dt;
     if (this.humanSpawnTimer > baseHumanInterval) {
         this.humanSpawnTimer = 0;
+        
+        // 2. Calculate Level
+        const startLvl = regionConfig.levelConfig?.startLevel ?? 1;
+        const lvlScale = regionConfig.levelConfig?.levelsPerStage ?? 1;
+        const level = Math.floor(startLvl + (this.currentStageIndex * lvlScale));
+
         const spawnZoneStart = (this.currentStageIndex + 1) * STAGE_WIDTH + 100;
         const spawnZoneEnd = (this.currentStageIndex + 2) * STAGE_WIDTH - 200;
         const spawnX = spawnZoneStart + Math.random() * (spawnZoneEnd - spawnZoneStart);
@@ -751,9 +763,6 @@ export class GameEngine implements IGameEngine {
            }
            return spawnTable[0].type;
       };
-
-      // Determine Level from Stage
-      const level = Math.max(1, this.currentStageIndex + 1);
 
       const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), spawnX, this.modifiers, level);
       if (u) {
