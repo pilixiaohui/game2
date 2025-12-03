@@ -480,9 +480,10 @@ GeneLibrary.register({
     name: '亡语：小虫',
     onDeath: (self, engine, params) => {
         const count = params.count || 2;
+        const type = params.unitType || UnitType.MELEE;
         for(let i=0; i<count; i++) {
             const offsetX = (Math.random() - 0.5) * 20;
-            engine.spawnUnit(self.faction, UnitType.MELEE, self.x + offsetX);
+            engine.spawnUnit(self.faction, type, self.x + offsetX);
         }
         engine.createFloatingText(self.x, self.y, "SPAWN!", 0x00ff00, 20);
     }

@@ -435,6 +435,7 @@ export interface GeneTrait {
 
 export interface IUnit {
     id: number;
+    level: number;
     active: boolean;
     isDead: boolean;
     type: UnitType;

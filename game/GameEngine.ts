@@ -13,6 +13,9 @@ export class Unit implements IUnit {
   faction: Faction = Faction.ZERG;
   type: UnitType = UnitType.MELEE;
   
+  // Level System
+  level: number = 1;
+
   // Physics & Transform
   x: number = 0;
   y: number = 0;
@@ -81,7 +84,7 @@ class UnitPool {
     }
   }
 
-  spawn(faction: Faction, type: UnitType, x: number, modifiers: GameModifiers): Unit | null {
+  spawn(faction: Faction, type: UnitType, x: number, modifiers: GameModifiers, level: number = 1): Unit | null {
     if (this.freeIndices.length === 0) return null; // Pool exhausted
     
     const idx = this.freeIndices.pop()!;
@@ -92,6 +95,8 @@ class UnitPool {
     unit.faction = faction;
     unit.type = type;
     unit.x = x;
+    unit.level = level;
+
     const r1 = Math.random();
     const r2 = Math.random();
     const yOffset = (r1 - r2) * (LANE_HEIGHT / 2); 
@@ -119,18 +124,28 @@ class UnitPool {
 
     if (faction === Faction.ZERG) {
         stats = DataManager.instance.getUnitStats(type, modifiers);
+        // Sync the unit object's level property with the actual Zerg level
+        unit.level = DataManager.instance.state.hive.unlockedUnits[type]?.level || 1;
     } else {
+        // Human logic with level scaling
+        const growHp = config.growthFactors?.hp || 0.1;
+        const growDmg = config.growthFactors?.damage || 0.05;
+
+        // Calculate Level Multipliers (Base is level 1, no bonus)
+        const lvlMultHp = 1 + (level - 1) * growHp;
+        const lvlMultDmg = 1 + (level - 1) * growDmg;
+
         stats = {
-            hp: config.baseStats.hp,
-            maxHp: config.baseStats.hp,
-            damage: config.baseStats.damage,
+            hp: config.baseStats.hp * lvlMultHp,
+            maxHp: config.baseStats.hp * lvlMultHp,
+            damage: config.baseStats.damage * lvlMultDmg,
             range: config.baseStats.range,
             speed: config.baseStats.speed,
             attackSpeed: config.baseStats.attackSpeed,
             width: config.baseStats.width,
             height: config.baseStats.height,
             color: config.baseStats.color,
-            armor: config.baseStats.armor,
+            armor: config.baseStats.armor + (level - 1) * 0.5,
             critChance: 0.05,
             critDamage: 1.5,
             element: config.elementConfig?.type || 'PHYSICAL'
@@ -474,7 +489,9 @@ export class GameEngine implements IGameEngine {
   
   public spawnUnit(faction: Faction, type: UnitType, x: number): IUnit | null {
       if (this.unitPool) {
-          return this.unitPool.spawn(faction, type, x, this.modifiers);
+          // If Human, default spawn level to current stage difficulty
+          const level = (faction === Faction.HUMAN) ? (this.currentStageIndex + 1) : 1;
+          return this.unitPool.spawn(faction, type, x, this.modifiers, level);
       }
       return null;
   }
@@ -527,15 +544,15 @@ export class GameEngine implements IGameEngine {
            return spawnTable[0].type;
       };
 
+      // Determine Level from Stage
+      const level = Math.max(1, stageIdx + 1);
+
       for(let i=0; i<count; i++) {
            const x = stageStart + Math.random() * width;
-           const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), x, this.modifiers);
-           // Apply Stage HP scaling (visualized by size, but logic is stats)
+           const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), x, this.modifiers, level);
+           
            if (u) {
                u.state = 'MOVE';
-               const hpScale = 1 + (stageIdx / 50); // Global scaling
-               u.stats.maxHp *= hpScale;
-               u.stats.hp = u.stats.maxHp;
            }
       }
   }
@@ -733,16 +750,15 @@ export class GameEngine implements IGameEngine {
                r -= entry.weight;
            }
            return spawnTable[0].type;
-        };
+      };
 
-        const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), spawnX, this.modifiers);
-        if (u) {
+      // Determine Level from Stage
+      const level = Math.max(1, this.currentStageIndex + 1);
+
+      const u = this.unitPool.spawn(Faction.HUMAN, getWeightedType(), spawnX, this.modifiers, level);
+      if (u) {
             u.state = 'MOVE';
-             // Apply HP Scale
-            const hpScale = 1 + (this.currentStageIndex / 50); 
-            u.stats.maxHp *= hpScale;
-            u.stats.hp = u.stats.maxHp;
-        }
+      }
     }
   }
 
